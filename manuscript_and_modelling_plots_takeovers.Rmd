@@ -593,24 +593,106 @@ grand_mean_n_back_ame_sd_steer %>% mean_hdi()
 
 - TO DO 
 
-Tidy up longitudinal jerk modelling 
+Calculate the average absolute lateral accelerations were and see if it correlates with maximum lateral accelerations
 
-Model lateral jerk to see if model fit and inferences are still good (with maximal random effects)
+Find studies that talk about max decelerations being around 12 m/s^2 and how this makes modelling the response difficult by just taking the max value, but averaging over the all the decleration produces some nice fits - I think it's Gold et al or maybe Radlymayr et al who mentions the max longitudinal metric
 
-Add random interactions to all the other models 
+Further investigate variance in the effect of N-back on mean deceleration. 
 
-Adjust the plots and tables
-
-Send to co-authors and start on supplemental material.
+Check if a Gaussian produces a better fit than the skew gaussian. 
 
 ```{r}
-# distribution of negative longitudinal jerk
 ggplot(response.vehicle.eye %>%
          dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
          dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-         dplyr::mutate(ppid = as.factor(ppid)), mapping = aes(max_long_jerk)) +
+         dplyr::mutate(ppid = as.factor(ppid)), mapping = aes(mean_decel)) +
   geom_histogram() +
   facet_grid(n_back ~ ttc_criticality_factor)
+
+# regularising priors for parameter values
+prior(student_t(5, 9, 2.5)) %>% 
+  parse_dist() %>% 
+  ggplot(aes(xdist = .dist_obj, y = prior)) + 
+  stat_halfeye(.width = c(.5, .99)) +
+  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
+  scale_x_continuous(expression(italic(p)(beta[1]))) +
+  theme_bw()
+
+prior(normal(9, 2)) %>% 
+  parse_dist() %>% 
+  ggplot(aes(xdist = .dist_obj, y = prior)) + 
+  stat_halfeye(.width = c(.5, .99)) +
+  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
+  scale_x_continuous(expression(italic(p)(beta[1]))) +
+  theme_bw()
+
+mean_decel_skewnormal_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal.rds"))
+
+# model of maximum longitudinal jerk with regularising priors. Random effects structure is maximal
+mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
+                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
+                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                             dplyr::mutate(ppid = as.factor(ppid)),
+                                           family = skew_normal(),
+                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                                     prior(student_t(3, 0, 2.5), class = "b")),
+                                           bf(mean_decel ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
+                                           control = list(adapt_delta = 0.99999999999),
+                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
+                                           file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal"))
+# summarising model parameters 
+print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
+describe_posterior(mean_decel_skewnormal_reg_priors_maximal , centrality = "mean")
+
+
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
+
+
+
+# model of maximum longitudinal jerk with regularising priors. Random effects structure is maximal
+skew_skew_mix = mixture(family = skew_normal(), family = skew_normal(), order = 'mu')
+
+max_long_jerk_skewnormal_mix_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
+                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
+                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                             dplyr::mutate(ppid = as.factor(ppid)),
+                                           family = skew_skew_mix,
+                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu1"),
+                                                prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu2"),
+                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu1"),
+                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu2")),
+                                           max_long_jerk ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid),
+                                           control = list(adapt_delta = 0.99999999999),
+                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
+                                           file = here::here("takeover_performance_cogload_time_budget/Models/max_long_jerk_skewnormal_mix_reg_priors_maximal"))
+# summarising model parameters 
+print(summary(max_long_jerk_skewnormal_mix_reg_priors_maximal), digits = 5)
+describe_posterior(max_long_jerk_skewnormal_reg_priors_maximal, centrality = "mean")
+
+pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back.x")
+
+pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "hist", stat = "mean", group = "n_back.x")
+
+pp_check(max_long_jerk_skewnormal_mix_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(max_long_jerk_skewnormal_mix_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+
+grand_mean_n_back_dist <- max_long_jerk_skewnormal_reg_priors_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = c(TRUE, FALSE)),
+              re_formula = NA)
+
+grand_mean_n_back_dist %>% mean_hdi()
+
+
 
 
 max_long_skewnormal_hella_weak_priors <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_skewnormal_hella_weak.rds"))
@@ -885,7 +967,7 @@ grand_mean_n_back_dist %>% mean_hdi()
 
 # model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
 
-max_long_mixture_weak_priors  <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_mixture_weak_prior.rds"))
+max_long_mixture_6  <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_jerk_skewnormal_reg_priors_maximal.rds"))
 
 skew_skew_mix = mixture(family = skew_normal(), family = skew_normal(), order = 'mu')
 
@@ -908,45 +990,17 @@ print(summary(max_long_mixture_6), digits = 5)
 describe_posterior(max_long_mixture_6, centrality = "mean")
 
 pp_check(max_long_mixture_6, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_mixture_6, type = "stat_grouped", stat = "mean", group = "n_back")
+pp_check(max_long_mixture_6, type = "stat_grouped", stat = "mean", group = "n_back.x")
 
-pp_check(max_long_mixture_6, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(max_long_mixture_6, type = "dens_overlay_grouped", group = "n_back.x", ndraws = 100)
 pp_check(max_long_mixture_6, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
-grand_mean_n_back_dist <- max_long_mixture_2_ttc %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5))),
+grand_mean_n_back_dist <- max_long_mixture_6 %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back.x = c(TRUE, FALSE)),
               re_formula = NA)
 
 grand_mean_n_back_dist %>% mean_hdi()
-
-
-# model of maximum longitudinal acceleration with hella weak priors. To check if the model is blowing up cause if lack of priors constraining parameter values
-max_long_jerk_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                             dplyr::mutate(ppid = as.factor(ppid)),
-                                           family = skew_normal(),
-                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                     prior(student_t(3, 0, 2.5), class = "b")),
-                                           max_long_jerk ~ n_back.x * ttc_criticality_factor + (n_back.x * ttc_criticality_factor | ppid),
-                                           control = list(adapt_delta = 0.99999999999),
-                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                           file = "max_long_jerk_skewnormal_reg_priors_maximal")
-
-
-print(summary(max_long_jerk_skewnormal_reg_priors_maximal), digits = 5)
-describe_posterior(max_long_jerk_skewnormal_reg_priors_maximal, centrality = "mean")
-
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back.x")
-
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "hist", stat = "mean", group = "n_back.x")
-
-
-
-
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back.x", ndraws = 100)
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
 
 
@@ -981,34 +1035,14 @@ grand_mean_n_back_dist <- max_long_jerk_skewnormal_reg_priors %>%
 
 grand_mean_n_back_dist %>% mean_hdi()
 
-# prior for beta_C i.e., the change in max long when TTC = 5 s
-prior(uniform(10, 11)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw()
-
-# regularising priors for the rest of the parameters
-prior(normal(9, 1)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw()
-
-prior(student_t(30, 9, 2.5)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw()
 
 
 
+d <- max_long_mixture_6$data
+
+ggplot(d, mapping = aes(max_long_jerk)) +
+  geom_histogram() +
+  facet_grid(n_back.x ~ ttc_criticality_factor)
 ```
 
 ## Modelling - lateral accelerations
@@ -1017,7 +1051,13 @@ prior(student_t(30, 9, 2.5)) %>%
 ggplot(response.vehicle.eye %>%
          dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0), mapping = aes(x = max_lat)) +
   geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") +
-  facet_wrap(~ttc_criticality.x)
+  facet_grid(n_back ~ttc_criticality.x)
+
+ggplot(response.vehicle.eye %>%
+         dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0), mapping = aes(x = mean_lat_acc)) +
+  geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") +
+  facet_grid(n_back ~ttc_criticality.x)
+
 
 # load model
 mod_max_lat_bayesian_lognormal <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_lat_lognormal_priors.rds"))
