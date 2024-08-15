@@ -187,7 +187,7 @@ response.vehicle.eye %>%
   View()
 ```
 
-# Modelling: Braking RT - model fitting
+# Braking RT - model fitting
 
 A paper by Ruscio et al (2015) proposed that braking reaction time is a multi-component cognitive skill:
 
@@ -200,31 +200,60 @@ A paper by Ruscio et al (2015) proposed that braking reaction time is a multi-co
 In that study, they focus on braking in manual driving and thus lifting the foot from the accelerator and onto the brake is consider a component. However in the current study, driver's feet were off the pedal. Hence future work might want to begin modelling potential changes in "non-decision time" associated with event criticality and n-back. In this sense, ndt refers to steps 1 and 2.
 
 ```{r}
-# load model
-mod_braking_rt_bayesian_shifted_lognormal_ttc_slope <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/braking_rt_shifted_log_ttc_slope_priors.rds"))
+# loading model
+braking_rt_shifted_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/braking_rt_shifted_lognormal_maximal.rds"))
 
 # adding a random slope for the criticality of the effect
-mod_braking_rt_bayesian_shifted_lognormal_ttc_slope <- brm(data = response.vehicle.eye %>% 
-                                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>% 
-                                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>% 
-                                                             dplyr::mutate(ppid = as.factor(ppid)), 
-                                                           family = shifted_lognormal(),
-                                                           rt ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
-                                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                                     prior(student_t(3, 0, 2.5), class = "b"),
-                                                                     prior(lkj(2), class = cor)),
-                                                                     iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                                                     file = "braking_rt_shifted_log_ttc_slope_priors")
+braking_rt_shifted_lognormal_maximal <- brm(data = response.vehicle.eye %>%
+                                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                              dplyr::mutate(ppid = as.factor(ppid)), 
+                                            family = shifted_lognormal(),
+                                            bf(rt ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
+                                            prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                                      prior(student_t(3, 0, 2.5), class = "b"),
+                                                      prior(lkj(2), class = cor)),
+                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
+                                            file = here::here("takeover_performance_cogload_time_budget/Models/braking_rt_shifted_lognormal_maximal.rds"))
+
+print(summary(braking_rt_shifted_lognormal_maximal), digits = 5)
+describe_posterior(braking_rt_shifted_lognormal_maximal, centrality = "mean")
 
 # posterior predictive checks
-pp_check(mod_braking_rt_bayesian_shifted_lognormal_ttc_slope, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) +
-  ggtitle("shifted_lognormal")
+pp_check(braking_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(braking_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 
-print(summary(mod_braking_rt_bayesian_shifted_lognormal_ttc_slope), digits = 5)
-describe_posterior(mod_braking_rt_bayesian_shifted_lognormal_ttc_slope, centrality = "mean")
+
+# posterior predictive checks
+pp_check(braking_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(braking_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
 ```
 
-# Modelling: Braking RT - Visualising posterior draws and means
+# Braking RT - model predictions
+
+Calculating predicted braking RT implied by the model parameters, and the average effect of time budget on braking RT
+
+```{r}
+# average effect of TTC on braking RT 
+braking_rt_MER_TTC <- braking_rt_shifted_lognormal_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+braking_rt_MER_TTC  %>% mean_hdi()
+
+# predicted global mean RTs implied by the model # setting re_formula = NA tells the function to not use any random effects - here we plot the TTC specific distributions 
+predicted_braking_rt_ttc <- braking_rt_shifted_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_braking_rt_ttc %>% mean_hdi()
+```
+
+# Braking RT - visualising posterior draws and means
 
 In the chunk below, I plot the posterior expected values alongside the distributions, over the raw data. The function *data_grid()* produces an empty dataframe from which to generate predictions from bthe model (https://mjskay.github.io/tidybayes/articles/tidy-brms.html)
 
@@ -238,13 +267,13 @@ empty_grid = response.vehicle.eye %>%
 
 # we use a new dataset to plug into the model and a generate posterior predictive distribution. For this, we take into account the uncertainty of the fixed coefficients, the uncertainty of the variance parameters (random effects), and the uncertainty of individual observations (residual variance). With the model that contains this information and the new data, we can generate predictions regarding the uncertainty of new, unobserved data points.
 predicted_draws = empty_grid %>%
-  add_predicted_draws(mod_braking_rt_bayesian_shifted_lognormal_ttc_slope)
+  add_predicted_draws(braking_rt_shifted_lognormal_maximal)
 
 # When focusing on the marginal effects, we want to focus on the uncertainty of the parameter values, rather than individual residuals. So we can use the epred_draws() function to generate expected values. These include uncertainty of just two elements: uncertainty of the fixed effects, and uncertainty of the variance parameter (random effects). The argument re_formula = NULL is the default and thus the random effects are incorporated by default. Setting re_formula = NA removes the influences of the random effects.  
 
 # It should be noted that for the shifted log normal distribution, E(y) = exp(mu + sigma^2 / 2 + ndt) (https://github.com/paul-buerkner/brms/blob/28f778d7933f95422dda8f9a9f4333b975261120/R/posterior_epred.R#L341)
 expected_values = empty_grid %>%
-  add_epred_draws(mod_braking_rt_bayesian_shifted_lognormal_ttc_slope)
+  add_epred_draws(braking_rt_shifted_lognormal_maximal)
 
 # labels
 ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
@@ -267,46 +296,28 @@ posterior_braking_rt <- response.vehicle.eye %>%
   scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
   scale_color_brewer("Posterior predictive interval") +
   ggtitle("A") +
-  #xlim(.5, 3.5) +
+  xlim(.5, 3.5) +
   xlab(expression(RT[B]~ "(s)")) +
   ylab(" ") +
-  scale_x_continuous(breaks = seq(1, 3, .5), labels = label_number(accuracy = .5)) +
+  #scale_x_continuous(breaks = seq(.5, 3, .5), labels = label_number(accuracy = .5)) +
   facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
   theme_bw() +
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
-# predicted gloabl mean RTs implied by the model
 
-# setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-grand_mean_n_back_dist <- mod_braking_rt_bayesian_shifted_lognormal_ttc_slope %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-global_mean_ttc_braking_rt <- ggplot(grand_mean_n_back_dist ,aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_braking_rt_ttc_plot <- ggplot(predicted_braking_rt_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
   ylab(NULL) +
-  xlab(expression("Predicted mean"~ RT[B]~ "(s)")) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ RT[B]~ "(s)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   xlim(1, 1.6) +
   theme_bw() +
   theme(legend.position = c(.87, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-# and now we plot the distribution of the difference between n_back and no n-back 
-grand_mean_n_back_mer <- mod_braking_rt_bayesian_shifted_lognormal_ttc_slope %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_mer  %>% mean_hdi()
 
 # Marginal Effects at Representative values (MER) of TTC on braking RT
-MER_ttc_braking_rt <- ggplot(grand_mean_n_back_mer, aes(x = .value, y = " ")) +
+braking_rt_MER_TTC_plot <- ggplot(braking_rt_MER_TTC, aes(x = .value, y = " ")) +
   stat_halfeye() +
   ylab(NULL) +
   xlab(expression(MER[RT[B]]~ "(s) for TTC")) +
@@ -315,13 +326,13 @@ MER_ttc_braking_rt <- ggplot(grand_mean_n_back_mer, aes(x = .value, y = " ")) +
   theme_bw() +
   theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig1 <- posterior_braking_rt / (global_mean_ttc_braking_rt | MER_ttc_braking_rt)
+fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig1.tiff"), plot = fig1, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-# Modelling: hands-on time
+# Hands-on time: model fitting
 
 Seemingly no effect of cognitive load on hands on time. Small effect on criticality 
 
@@ -334,31 +345,69 @@ ggplot(response.vehicle.eye %>%
   facet_wrap(~ ttc_criticality.x) +
   xlim(0, 3.5)
 
-# load model
-mod_ho_rt_bayesian_shifted_lognormal_ttc_slope <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/ho_rt_shifted_log_ttc_slope_priors.rds"))
+# loading model
+handson_rt_shifted_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/handson_rt_shifted_lognormal_maximal.rds"))
 
 # adding a random slope for the criticality of the effect
-mod_ho_rt_bayesian_shifted_lognormal_ttc_slope <- brm(data = response.vehicle.eye %>%
+handson_rt_shifted_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                                    dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>% 
                                                      dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>% 
                                                      dplyr::mutate(ppid = as.factor(ppid)),
                                                    family = shifted_lognormal(), 
-                                                   ho.rt ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
+                                                   bf(ho.rt ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
                                                    prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
                                                              prior(student_t(3, 0, 2.5), class = "b"),
                                                              prior(lkj(2), class = cor)),
                                                    iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                                                   file = "ho_rt_shifted_log_ttc_slope_priors")
+                                                   file = here::here("takeover_performance_cogload_time_budget/Models/handson_rt_shifted_lognormal_maximal"))
 
-print(summary(mod_ho_rt_bayesian_shifted_lognormal_ttc_slope), digits = 5)
-describe_posterior(mod_ho_rt_bayesian_shifted_lognormal_ttc_slope)
+# posterior predictive checks
+pp_check(handson_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(handson_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 
+
+# posterior predictive checks
+pp_check(handson_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(handson_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+
+
+```
+
+# Hands-on steering time: model predictions
+
+```{r}
+print(summary(handson_rt_shifted_lognormal_maximal), digits = 5)
+describe_posterior(handson_rt_shifted_lognormal_maximal)
+
+#### Global mean effect of TTC #### # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
+predicted_ho_rt_ttc <- handson_rt_shifted_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_ho_rt_ttc %>% mean_hdi()
+
+# and now we plot the distribution of the difference between n_back and no n-back 
+ho_rt_MER_TTC <- handson_rt_shifted_lognormal_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+ho_rt_MER_TTC %>% mean_hdi()
+```
+
+# Hands-on steering time - visualising posterior draws and means
+
+```{r}
 #### predicted posterior means and distribution ####
 predicted_draws = empty_grid %>%
-  add_predicted_draws(mod_ho_rt_bayesian_shifted_lognormal_ttc_slope)
+  add_predicted_draws(handson_rt_shifted_lognormal_maximal)
 
 expected_values = empty_grid %>%
-  add_epred_draws(mod_ho_rt_bayesian_shifted_lognormal_ttc_slope)
+  add_epred_draws(handson_rt_shifted_lognormal_maximal)
 
 # labels
 ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
@@ -379,45 +428,28 @@ posterior_ho_rt <- response.vehicle.eye %>%
   scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
   scale_color_brewer("Posterior predictive interval") +
   ggtitle("A") +
-  #xlim(.5, 3.5) +
+  xlim(.5, 3.5) +
   xlab(expression(RT[HO]~ "(s)")) +
   ylab(" ") +
-  scale_x_continuous(limits = c(0, 3.5), breaks = seq(0, 3, .5), labels = label_number(accuracy = .5)) +
+  #scale_x_continuous(limits = c(0, 3.5), breaks = seq(0, 3, .5), labels = label_number(accuracy = .5)) +
   facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
   theme_bw() +
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
-#### Global mean effect of TTC ####
 
-# setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-grand_mean_n_back_dist_hort <- mod_ho_rt_bayesian_shifted_lognormal_ttc_slope %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_n_back_dist_hort %>% mean_hdi()
-
-global_mean_ttc_ho_rt <- ggplot(grand_mean_n_back_dist_hort, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+# predicted hands-on time 
+predicted_ho_rt_ttc_plot <- ggplot(predicted_ho_rt_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
   ylab(NULL) +
-  xlab(expression("Predicted mean"~ RT[HO]~ "(s)")) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ RT[HO]~ "(s)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
   theme(legend.position = c(.88, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-# and now we plot the distribution of the difference between n_back and no n-back 
-grand_mean_n_back_mer_hort <- mod_ho_rt_bayesian_shifted_lognormal_ttc_slope %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_mer_hort %>% mean_hdi()
 
 # MER of TTC on hands on RT
-MER_ttc_ho_rt <- ggplot(grand_mean_n_back_mer_hort, aes(x = .value, y = " ")) +
+ho_rt_MER_TTC_plot <- ggplot(ho_rt_MER_TTC, aes(x = .value, y = " ")) +
   stat_halfeye() +
   ylab(NULL) +
   xlab(expression(MER[RT[HO]]~ "(s) of TTC")) +
@@ -426,170 +458,13 @@ MER_ttc_ho_rt <- ggplot(grand_mean_n_back_mer_hort, aes(x = .value, y = " ")) +
   theme_bw() +
   theme(legend.position = c(.93, .62), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig2 <- posterior_ho_rt / (global_mean_ttc_ho_rt | MER_ttc_ho_rt)
+fig5 <- posterior_ho_rt / (predicted_ho_rt_ttc_plot | ho_rt_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig2.tiff"), plot = fig2, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig5.tiff"), plot = fig5, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-# Difference between hands on time and braking reaction time
-
-```{r}
-response.vehicle.eye.removed <- response.vehicle.eye %>%
-  dplyr::ungroup() %>%
-  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0) %>%
-  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x), ppid = as.factor(ppid))
-
-effects_existing_groups_braking_rt <- mod_braking_rt_bayesian_shifted_lognormal_ttc_slope %>%
-  emmeans(~ ttc_criticality_factor + ppid,
-          at = list(n_back = FALSE,
-                    ppid = levels(as.factor(response.vehicle.eye.removed$ppid))),
-          epred = TRUE, re_formula = NULL) %>% 
-  contrast(method = "revpairwise", by = "ppid") %>% 
-  gather_emmeans_draws() %>%
-  mean_hdi() 
-
-braking_rt_mer_drivers <- effects_existing_groups_braking_rt %>%
-  ggplot() +
-  geom_point(mapping = aes(x = .value, y = ppid)) +
-  geom_errorbarh(mapping = aes(x = .value, y = ppid, xmin = .lower, xmax = .upper), height = .5) +
-  geom_vline(mapping = aes(xintercept = 0), linetype = "dashed", col = "red") + 
-  xlim(-1, 3) +
-  ggtitle("A") +
-  ylab("Drivers") +
-  xlab(expression(italic(BRT[MER])~ "of TTC (s) for each driver")) +
-  theme_bw() +
-  theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 12), axis.text.x = element_text(size = 12), axis.title.y = element_text(size = 12), axis.text.y = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) +
-  expand_limits(y = c(-5, 20))
-
-
-effects_existing_groups_ho_rt <- mod_ho_rt_bayesian_shifted_lognormal_ttc_slope %>%
-  emmeans(~ ttc_criticality_factor + ppid,
-          at = list(n_back = FALSE,
-                    ppid = levels(as.factor(response.vehicle.eye.removed$ppid))),
-          epred = TRUE, re_formula = NULL) %>% 
-  contrast(method = "revpairwise", by = "ppid") %>% 
-  gather_emmeans_draws() %>%
-  mean_hdi() 
-
-ho_rt_mer_drivers <- effects_existing_groups_ho_rt %>%
-  ggplot() +
-  geom_point(mapping = aes(x = .value, y = ppid)) +
-  geom_errorbarh(mapping = aes(x = .value, y = ppid, xmin = .lower, xmax = .upper), height = .5) +
-  geom_vline(mapping = aes(xintercept = 0), linetype = "dashed", col = "red") +
-  xlim(-1, 3) +
-  ggtitle("B") +
-  xlab(expression(italic(HORT[MER])~ "of TTC (s) for each driver")) +
-  ylab("Drivers") +
-  theme_bw() +
-  theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 12), axis.text.x = element_text(size = 12), axis.title.y = element_text(size = 12), axis.text.y = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) +
-  expand_limits(y = c(-5, 20))
-
-fig3 <- braking_rt_mer_drivers / ho_rt_mer_drivers
-
-# plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig3.tiff"), plot = fig3, width = 17, height = 15, units = 'cm', dpi = 300, type = 'cairo')
-```
-
-## Modelling - SD of SWA
-
-```{r}
-
-
-# load model
-mod_sd_steer_bayesian_lognormal_priors <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/sd_steer_lognormal_priors.rds"))
-
-# sd of steering variance with regularising priors
-mod_sd_steer_bayesian_lognormal_priors <- brm(data = response.vehicle.eye %>%
-                                         dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>% 
-                                         dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>% 
-                                         dplyr::mutate(ppid = as.factor(ppid)),
-                                       family = lognormal(),
-                                       sd_steer ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
-                                       prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                 prior(student_t(3, 0, 2.5), class = "b")),
-                                       iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                       file = "sd_steer_lognormal_priors")
-
-print(summary(mod_sd_steer_bayesian_lognormal_priors), digits = 5)
-describe_posterior(mod_sd_steer_bayesian_lognormal_priors, centrality = "mean")
-
-# posterior predictive checks
-pp_check(mod_sd_steer_bayesian_lognormal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-
-# sd of steering variance with flat priors?
-mod_sd_steer_bayesian_lognormal_flat_priors <- brm(data = response.vehicle.eye %>%
-                                                     dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>% 
-                                                     dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                                     dplyr::mutate(ppid = as.factor(ppid)),
-                                                   family = lognormal(), 
-                                                   sd_steer ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
-                                                   iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                                   file = "sd_steer_lognormal")
-
-# logit model with weakly informative priors
-prior(student_t(3, 0, 2.5)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw() +xlim(-20, 20)
-
-
-prior(cauchy(0, 2.5)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw() +
-  xlim(-20, 20)
-
-print(summary(mod_sd_steer_bayesian_lognormal_flat_priors), digits = 5)
-describe_posterior(mod_sd_steer_bayesian_lognormal_flat_priors)
-
-
-### effect of TTC s###
-grand_mean_ttc_sd_steer <- mod_sd_steer_bayesian_lognormal_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_ttc_sd_steer %>% mean_hdi()
-
-# and now we plot the distribution of the difference between n_back and no n-back 
-grand_mean_ttc_ame_sd_steer <- mod_sd_steer_bayesian_lognormal_priors %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_ttc_ame_sd_steer %>% mean_hdi()
-
-
-#### effect of n-back ###
-grand_mean_n_back_sd_steer <- mod_sd_steer_bayesian_lognormal_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3)),
-                                    n_back = c(FALSE, TRUE)),
-              re_formula = NA)
-
-grand_mean_n_back_sd_steer %>% mean_hdi()
-
-
-grand_mean_n_back_ame_sd_steer <- mod_sd_steer_bayesian_lognormal_priors %>% 
-  emmeans(~ n_back,
-          at = list(ttc_criticality_factor = as.factor(3)),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_ame_sd_steer %>% mean_hdi()
-
-```
-
-## Modelling - longituindal accelerations
+## Modelling - mean decelerations
 
 - TO DO 
 
@@ -607,7 +482,7 @@ ggplot(response.vehicle.eye %>%
          dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
          dplyr::mutate(ppid = as.factor(ppid)), mapping = aes(mean_decel)) +
   geom_histogram() +
-  facet_grid(n_back ~ ttc_criticality_factor)
+  facet_grid(~ttc_criticality_factor)
 
 # regularising priors for parameter values
 prior(student_t(5, 9, 2.5)) %>% 
@@ -628,7 +503,7 @@ prior(normal(9, 2)) %>%
 
 mean_decel_skewnormal_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal.rds"))
 
-# model of maximum longitudinal jerk with regularising priors. Random effects structure is maximal
+# modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is skew-normal. 
 mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
                                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
@@ -640,6 +515,7 @@ mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            control = list(adapt_delta = 0.99999999999),
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal"))
+
 # summarising model parameters 
 print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
 describe_posterior(mean_decel_skewnormal_reg_priors_maximal , centrality = "mean")
@@ -652,432 +528,76 @@ pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped"
 pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
 
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
+d <- pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
+
+ggplot(d[["data"]], mapping = aes(value)) +
+  geom_histogram(aes(fill = as.factor(is_y))) +
+  facet_wrap(~ rep_id)
 
 
 
-# model of maximum longitudinal jerk with regularising priors. Random effects structure is maximal
-skew_skew_mix = mixture(family = skew_normal(), family = skew_normal(), order = 'mu')
-
-max_long_jerk_skewnormal_mix_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
+# modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is Gaussian.
+mean_decel_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
                                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
                                              dplyr::mutate(ppid = as.factor(ppid)),
-                                           family = skew_skew_mix,
-                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu1"),
-                                                prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu2"),
-                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu1"),
-                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu2")),
-                                           max_long_jerk ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid),
-                                           control = list(adapt_delta = 0.99999999999),
-                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                           file = here::here("takeover_performance_cogload_time_budget/Models/max_long_jerk_skewnormal_mix_reg_priors_maximal"))
-# summarising model parameters 
-print(summary(max_long_jerk_skewnormal_mix_reg_priors_maximal), digits = 5)
-describe_posterior(max_long_jerk_skewnormal_reg_priors_maximal, centrality = "mean")
-
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back.x")
-
-pp_check(max_long_jerk_skewnormal_reg_priors_maximal, type = "hist", stat = "mean", group = "n_back.x")
-
-pp_check(max_long_jerk_skewnormal_mix_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_jerk_skewnormal_mix_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-grand_mean_n_back_dist <- max_long_jerk_skewnormal_reg_priors_maximal %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-
-
-
-max_long_skewnormal_hella_weak_priors <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_skewnormal_hella_weak.rds"))
-
-# model of maximum longitudinal acceleration with hella weak priors. To check if the model is blowing up cause if lack of priors constraining parameter values
-max_long_skewnormal_hella_weak_priors <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = skew_normal(),
-                                      prior = c(prior(normal(0, 100), class = "Intercept"),
-                                                prior(normal(0, 100), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_skewnormal_hella_weak")
-
-grand_mean_n_back_dist <- max_long_skewnormal_hella_weak_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-print(summary(max_long_skewnormal_hella_weak_priors), digits = 5)
-describe_posterior(max_long_skewnormal_hella_weak_priors, centrality = "mean")
-
-pp_check(max_long_skewnormal_hella_weak_priors, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
-
-
-pp_check(max_long_skewnormal_hella_weak_priors, type = "stat_grouped", stat = "mean", group = "n_back")
-pp_check(max_long_skewnormal_hella_weak_priors, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-
-pp_check(max_long_skewnormal_hella_weak_priors, type = "stat_2d", stat = c("max", "min"))
-
-
-
-max_long_skewnormal_kinda_weak_priors <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_skewnormal_kinda_weak.rds"))
-
-# model of maximum longitudinal acceleration with kinda weak priors. Do parameter values still make sense ruling out really extreme values. 
-max_long_skewnormal_kinda_weak_priors <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = skew_normal(),
-                                      prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                prior(student_t(3, 0, 2.5), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_skewnormal_kinda_weak")
-
-print(summary(max_long_skewnormal_kinda_weak_priors), digits = 5)
-describe_posterior(max_long_skewnormal_kinda_weak_priors, centrality = "mean")
-
-pp_check(max_long_skewnormal_kinda_weak_priors, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-pp_check(max_long_skewnormal_kinda_weak_priors, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-
-pp_check(max_long_skewnormal_kinda_weak_priors, type = "stat_grouped", stat = "mean", group = "n_back")
-pp_check(max_long_skewnormal_kinda_weak_priors, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-
-pp_check(max_long_skewnormal_specific_priors, type = "stat_2d", stat = c("max", "min"))
-
-
-grand_mean_n_back_dist <- max_long_skewnormal_kinda_weak_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
-max_long_skewnormal_kinda_weak_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = skew_normal(),
-                                      prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                prior(student_t(3, 0, 2.5), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_skewnormal_kinda_weak_maximal")
-
-print(summary(max_long_skewnormal_kinda_weak_priors_maximal), digits = 5)
-describe_posterior(max_long_skewnormal_kinda_weak_priors_maximal, centrality = "mean")
-  
-pp_check(max_long_skewnormal_kinda_weak_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-
-ggplot() +
-  geom_vline(response.vehicle.eye %>%
-               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-               dplyr::group_by(n_back) %>%
-               dplyr::summarise(m = mean(max_long)), mapping = aes(xintercept = m)) +
-  geom_histogram(pp_n_back_data$data %>%
-                   dplyr::mutate(n_back = group), mapping = aes(x = value)) +
-  facet_wrap(~ n_back)
-
-pp_check(max_long_skewnormal_kinda_weak_priors_maximal, type = "stat_grouped", stat = "median", group = "ttc_criticality_factor")
-
-pp_check(max_long_skewnormal_kinda_weak_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_skewnormal_kinda_weak_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-grand_mean_n_back_dist <- max_long_skewnormal_kinda_weak_priors_maximal %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-max_long_laplace_kinda_weak_priors_maximal <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_asym_laplace_kinda_weak_maximal.rds"))
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
-max_long_laplace_kinda_weak_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = asym_laplace(),
-                                      prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                prior(student_t(3, 0, 2.5), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_asym_laplace_kinda_weak_maximal")
-
-
-print(summary(max_long_laplace_kinda_weak_priors_maximal), digits = 5)
-describe_posterior(max_long_laplace_kinda_weak_priors_maximal, centrality = "mean")
-
-grand_mean_n_back_dist <- max_long_laplace_kinda_weak_priors_maximal %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-pp_check(max_long_laplace_kinda_weak_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_laplace_kinda_weak_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-pp_check(max_long_laplace_kinda_weak_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_laplace_kinda_weak_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects - seems like a more specific prior helps the model fit. Work out what the parameters are for laplace and work out if we can get more specific? Also toy around with removing interaction random effect? 
-max_long_laplace_specific_priors <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = asym_laplace(),
-                                      prior = c(prior(normal(9, .5), class = "Intercept"),
-                                                prior(normal(.5, .1), class = "b", coef = "ttc_criticality_factor5"),
-                                                prior(student_t(3, 0, 2.5), class = "b", coef = "n_backTRUE"),
-                                                prior(student_t(3, 0, 2.5), class = "b", coef = "n_backTRUE:ttc_criticality_factor5")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_laplace_specific_priors")
-
-grand_mean_n_back_dist <- max_long_laplace_specific_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-print(summary(max_long_laplace_specific_priors), digits = 5)
-describe_posterior(max_long_laplace_specific_priors, centrality = "mean")
-
-pp_check(max_long_laplace_specific_priors, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_laplace_specific_priors, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(max_long_laplace_specific_priors, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_laplace_specific_priors, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
-max_long_laplace_kinda_weak_priors <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = asym_laplace(),
-                                      prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                prior(student_t(3, 0, 2.5), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_asym_laplace_kinda_weak")
-
-
-print(summary(max_long_laplace_specific_priors), digits = 5)
-describe_posterior(max_long_laplace_specific_priors, centrality = "mean")
-
-pp_check(max_long_laplace_kinda_weak_priors, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_laplace_kinda_weak_priors, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(max_long_laplace_kinda_weak_priors, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_laplace_kinda_weak_priors, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-# prior for beta_0 i.e., when ttc = 3, and N-back = FALSE. max decelerations typically do not exceed 11 m/s^2 so the prior distribution for TTC = 3 should reflect this. 
-prior(normal(9, .5)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw()
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
-max_long_laplace_specific_priors <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = asym_laplace(),
-                                      prior = c(prior(normal(0, 50), class = "Intercept"),
-                                                prior(normal(0, 50), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_laplace_hella_weak_normal_0_50")
-
-print(summary(max_long_laplace_specific_priors), digits = 5)
-describe_posterior(max_long_laplace_normal_0_5, centrality = "mean")
-
-pp_check(max_long_laplace_hella_weak_normal_0_50, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_laplace_hella_weak_normal_0_50, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(max_long_laplace_hella_weak_normal_0_50, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_laplace_hella_weak_normal_0_50, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-grand_mean_n_back_dist <- max_long_laplace_hella_weak %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-
-max_long_laplace_hella_weak <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_laplace_hella_weak.rds"))
-
-
-max_long_laplace_normal_0_5 <- brm(data = response.vehicle.eye %>%
-                                               dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                               dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                               dplyr::mutate(ppid = as.factor(ppid)),
-                                      family = asym_laplace(),
-                                      prior = c(prior(normal(0, 5), class = "Intercept"),
-                                                prior(normal(0, 5), class = "b")),
-                                      max_long ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_long_laplace_normal_0_5")
-
-print(summary(max_long_laplace_normal_0_5), digits = 5)
-describe_posterior(max_long_laplace_normal_0_5, centrality = "mean")
-
-pp_check(max_long_laplace_hella_weak, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_laplace_hella_weak, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(max_long_laplace_hella_weak, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(max_long_laplace_hella_weak, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-grand_mean_n_back_dist <- max_long_laplace_hella_weak %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-
-
-# model of maximum longitudinal acceleration with kinda weak priors. Including an interaction in the random effects
-
-max_long_mixture_6  <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_long_jerk_skewnormal_reg_priors_maximal.rds"))
-
-skew_skew_mix = mixture(family = skew_normal(), family = skew_normal(), order = 'mu')
-
-max_long_mixture_6 <- brm(data = response.vehicle.eye %>%
-                                dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                dplyr::mutate(ppid = as.factor(ppid)),
-                              family = skew_skew_mix,
-                                      prior = c(prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu1"),
-                                                prior(student_t(3, 0, 2.5), class = "Intercept", dpar = "mu2"),
-                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu1"),
-                                                prior(student_t(3, 0, 2.5), class = "b", dpar = "mu2")),
-                                      bf(max_long ~ n_back * ttc_criticality_factor + (1 | ppid),
-                                         theta1 ~ ttc_criticality_factor),
-                                      control = list(adapt_delta = 0.99999999999),
-                                      iter = 6000, warmup = 3000, chains = 4, cores = 4, seed = 13,
-                                      file = "max_long_mixture_6")
-
-print(summary(max_long_mixture_6), digits = 5)
-describe_posterior(max_long_mixture_6, centrality = "mean")
-
-pp_check(max_long_mixture_6, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_mixture_6, type = "stat_grouped", stat = "mean", group = "n_back.x")
-
-pp_check(max_long_mixture_6, type = "dens_overlay_grouped", group = "n_back.x", ndraws = 100)
-pp_check(max_long_mixture_6, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-grand_mean_n_back_dist <- max_long_mixture_6 %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back.x = c(TRUE, FALSE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-
-
-# model of maximum longitudinal acceleration with hella weak priors. To check if the model is blowing up cause if lack of priors constraining parameter values
-max_long_jerk_laplace_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                             dplyr::mutate(ppid = as.factor(ppid)),
-                                           family = asym_laplace(),
+                                           family = gaussian(),
                                            prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
                                                      prior(student_t(3, 0, 2.5), class = "b")),
-                                           max_long_jerk ~ n_back.x * ttc_criticality_factor + (n_back.x * ttc_criticality_factor | ppid),
+                                           bf(mean_decel ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
                                            control = list(adapt_delta = 0.99999999999),
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                           file = "max_long_jerk_laplace_reg_priors_maximal")
+                                           file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal"))
+# summarising model parameters 
+print(summary(mean_decel_gaussian_reg_priors_maximal), digits = 5)
+describe_posterior(mean_decel_gaussian_reg_priors_maximal, centrality = "mean")
 
 
-print(summary(max_long_jerk_laplace_reg_priors_maximal), digits = 5)
-describe_posterior(max_long_jerk_laplace_reg_priors_maximal, centrality = "mean")
+pp_check(mean_decel_gaussian_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(mean_decel_gaussian_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 
-pp_check(max_long_jerk_laplace_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(max_long_jerk_laplace_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back.x")
-
-pp_check(max_long_jerk_laplace_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back.x", ndraws = 100)
-pp_check(max_long_jerk_laplace_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-# setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-grand_mean_n_back_dist <- max_long_jerk_skewnormal_reg_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back.x = FALSE),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
+pp_check(mean_decel_gaussian_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(mean_decel_gaussian_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
 
-
-
-d <- max_long_mixture_6$data
-
-ggplot(d, mapping = aes(max_long_jerk)) +
-  geom_histogram() +
-  facet_grid(n_back.x ~ ttc_criticality_factor)
+pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
 ```
 
-## Modelling - lateral accelerations
+## Modelling - mean lateral accelerations
 
 ```{r}
 ggplot(response.vehicle.eye %>%
-         dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0), mapping = aes(x = max_lat)) +
-  geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") +
-  facet_grid(n_back ~ttc_criticality.x)
-
-ggplot(response.vehicle.eye %>%
          dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0), mapping = aes(x = mean_lat_acc)) +
   geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") +
-  facet_grid(n_back ~ttc_criticality.x)
+  facet_grid(n_back ~ ttc_criticality.x)
 
 
 # load model
-mod_max_lat_bayesian_lognormal <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/max_lat_lognormal_priors.rds"))
+mean_lat_acc_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_lat_acc_lognormal_maximal.rds"))
 
 # model of maximum longitudinal acceleration with priors
-mod_max_lat_bayesian_lognormal <- brm(data = response.vehicle.eye %>%
+mean_lat_acc_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                         dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
                                         dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
                                         dplyr::mutate(ppid = as.factor(ppid)),
                                       family = lognormal(),
                                       prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
                                                 prior(student_t(3, 0, 2.5), class = "b")),
-                                       max_lat ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor | ppid),
+                                       bf(mean_lat_acc ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
                                       control = list(adapt_delta = 0.99999999999),
                                       iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                      file = "max_lat_lognormal_priors")
+                                      file = here::here("takeover_performance_cogload_time_budget/Models/mean_lat_acc_lognormal_maximal"))
 
 
-print(summary(mod_max_lat_bayesian_lognormal), digits = 5)
-describe_posterior(mod_max_lat_bayesian_lognormal, centrality = "mean")
+pp_check(mean_lat_acc_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(mean_lat_acc_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+
+print(summary(mean_lat_acc_lognormal_maximal), digits = 5)
+describe_posterior(mean_lat_acc_lognormal_maximal, centrality = "mean")
 
 # effect of event critcality
 grand_mean_ttc_ame_max_la <- mod_max_lat_bayesian_lognormal %>% 
@@ -1168,27 +688,53 @@ ggplot(response.vehicle.eye %>%
   xlab("SDLP") +
   facet_wrap(~ ttc_criticality.x) 
 
-# load model
-mod_sdlp_bayesian_lognormal_priors <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/sdlp_lognormal_priors.rds"))
+sdlp_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal.rds"))
 
 # initial model of SDLP
-mod_sdlp_bayesian_lognormal_priors <- brm(data = response.vehicle.eye %>%
-                                     dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
-                                     dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                     dplyr::mutate(ppid = as.factor(ppid)),
-                                   family = lognormal(),
-                                   prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                prior(student_t(3, 0, 2.5), class = "b")),
-                                   sdlp ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
+sdlp_lognormal_maximal <- brm(data = response.vehicle.eye %>%
+                                dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                                dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                dplyr::mutate(ppid = as.factor(ppid)),
+                              family = lognormal(),
+                              prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                        prior(student_t(3, 0, 2.5), class = "b")),
+                              bf(sdlp ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
                                    control = list(adapt_delta = 0.95),
                                    iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                                   file = "sdlp_lognormal_priors")
+                                   file = here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal"))
 
-print(summary(mod_sdlp_bayesian_lognormal_priors), digits = 5)
-describe_posterior(mod_sdlp_bayesian_lognormal_priors, centrality = "mean")
+print(summary(sdlp_lognormal_maximal), digits = 5)
+describe_posterior(sdlp_lognormal_maximal, centrality = "mean")
 
-pp_check(mod_sdlp_bayesian_lognormal_priors, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
-pp_check(mod_sdlp_bayesian_lognormal_priors, type = "stat_grouped", stat = "mean", group = c("ttc_criticality_factor"))
+pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+pp_check(sdlp_lognormal_maximal, type = "hist", group = "ttc_criticality_factor")
+
+# initial model of SDLP
+sdlp_skew_normal_maximal <- brm(data = response.vehicle.eye %>%
+                                  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                                  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                  dplyr::mutate(ppid = as.factor(ppid)),
+                              family = skew_normal(),
+                              prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                        prior(student_t(3, 0, 2.5), class = "b")),
+                              bf(sdlp ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
+                                   control = list(adapt_delta = 0.95),
+                                   iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
+                                   file = here::here("takeover_performance_cogload_time_budget/Models/sdlp_skew_normal_maximal"))
+
+print(summary(sdlp_skew_normal_maximal), digits = 5)
+describe_posterior(sdlp_skew_normal_maximal, centrality = "mean")
+
+pp_check(sdlp_skew_normal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(sdlp_skew_normal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(sdlp_skew_normal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(sdlp_skew_normal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
 
 #### predicted posterior means and distribution ####
@@ -1284,45 +830,58 @@ fig7 <- posterior_sdlp / (global_mean_ttc_SDLP | MER_ttc_SDLP)
 ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig7.tiff"), plot = fig7, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-
-
 ## Loading model for SD of horizontal gaze during manual driving
 
 ```{r}
-# load model
-mod_sd_yaw_gaussian <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/sd_yaw_gaussian_priors.rds"))
+# SDLP - distributions
+ggplot(response.vehicle.eye %>%
+                dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15), mapping = aes(x = sd_yaw_manual)) +
+  geom_histogram(alpha = 0.5, bins = 50, col = "black") + 
+  xlab("SD yaw") +
+  facet_wrap(n_back ~ ttc_criticality.x) 
+
+sd_yaw_manual_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal.rds"))
 
 # initial model of sd_yaw
-mod_sd_yaw_gaussian <- brm(data = response.vehicle.eye %>%
+sd_yaw_manual_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
                              dplyr::mutate(ppid = as.factor(ppid)),
                            family = gaussian(),
-                           sd_yaw ~ n_back * ttc_criticality_factor + (n_back + ttc_criticality_factor| ppid),
+                           bf(sd_yaw_manual ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
                            prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
                                      prior(student_t(3, 0, 2.5), class = "b")),
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                                                   file = "sd_yaw_gaussian_priors")
-# posterior predictive checks
-pp_check(mod_sd_yaw_gaussian, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) +
-  ggtitle("gaussian")
+                           control = list(adapt_delta = 0.95),
+                           file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal"))
 
-print(summary(mod_sd_yaw_gaussian), digits = 5)
-describe_posterior(mod_sd_yaw_gaussian)
+# posterior predictive checks
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+
+print(summary(sd_yaw_manual_gaussian_maximal), digits = 5)
+describe_posterior(sd_yaw_manual_gaussian_maximal)
 ```
 
 ## Modelling SD yaw during automation
 
 ```{r}
-# load model
-mod_sd_yaw_automation_gaussian <- readRDS(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/sd_yaw_automation_gaussian_priors.rds"))
+# SDLP - distributions
+ggplot(response.vehicle.eye %>%
+                dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15), mapping = aes(x = sd_yaw_automation)) +
+  geom_histogram(alpha = 0.5, bins = 50, col = "black") + 
+  xlab("SD yaw") +
+  facet_wrap(~n_back) 
+
+sd_yaw_automation_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_gaussian_maximal.rds"))
 
 # initial model of sd_yaw
-mod_sd_yaw_automation_gaussian <- brm(data = response.vehicle.eye %>%
-                             dplyr::filter(rt.outlier == FALSE, 
-                                           ho.outlier == FALSE, 
-                                           ho.rt != 0, collision == 0, 
-                                           ho.rt > .15) %>%
+sd_yaw_automation_gaussian_maximal <- brm(data = response.vehicle.eye %>%
+                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
                              dplyr::mutate(ppid = as.factor(ppid)),
                            family = gaussian(),
@@ -1330,14 +889,16 @@ mod_sd_yaw_automation_gaussian <- brm(data = response.vehicle.eye %>%
                            prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
                                      prior(student_t(3, 0, 2.5), class = "b")),
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                                                   file = "sd_yaw_automation_gaussian_priors")
+                                                   file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_gaussian_maximal"))
+
 # model summmary
-print(summary(mod_sd_yaw_automation_gaussian), digits = 5)
-describe_posterior(mod_sd_yaw_automation_gaussian)
+print(summary(sd_yaw_automation_gaussian_maximal), digits = 5)
+describe_posterior(sd_yaw_automation_gaussian_maximal)
 
 # posterior predictive checks
-pp_check(mod_sd_yaw_automation_gaussian, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
-pp_check(mod_sd_yaw_automation_gaussian, type = "stat_grouped", stat = "mean", group = c("n_back"))
+pp_check(sd_yaw_automation_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+pp_check(sd_yaw_automation_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+
 
 # average predicted SD of yaw during automation with and without n-back
 sd_yaw_automation_n_back_dist <- mod_sd_yaw_automation_gaussian %>% 
