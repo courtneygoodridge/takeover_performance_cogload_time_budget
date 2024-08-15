@@ -464,7 +464,7 @@ fig5 <- posterior_ho_rt / (predicted_ho_rt_ttc_plot | ho_rt_MER_TTC_plot)
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig5.tiff"), plot = fig5, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-## Modelling - mean decelerations
+## Mean decelerations - model fitting
 
 - TO DO 
 
@@ -516,9 +516,6 @@ mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal"))
 
-# summarising model parameters 
-print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
-describe_posterior(mean_decel_skewnormal_reg_priors_maximal , centrality = "mean")
 
 
 pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
@@ -563,6 +560,97 @@ pp_check(mean_decel_gaussian_reg_priors_maximal, type = "dens_overlay_grouped", 
 pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
 ```
 
+# Mean decelerations: model predictions
+
+```{r}
+# summarising model parameters 
+print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
+describe_posterior(mean_decel_skewnormal_reg_priors_maximal , centrality = "mean")
+
+#### Global mean effect of TTC #### # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
+predicted_mean_decel_ttc <- mean_decel_skewnormal_reg_priors_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_mean_decel_ttc %>% mean_hdi()
+
+# effect of TTC when N-back is not TRUE
+mean_decel_MER_TTC <- mean_decel_skewnormal_reg_priors_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+mean_decel_MER_TTC %>% mean_hdi()
+```
+
+## Mean decelerations: visualising posterior draws and means
+
+```{r}
+#### predicted posterior means and distribution ####
+predicted_draws = empty_grid %>%
+  add_predicted_draws(mean_decel_skewnormal_reg_priors_maximal)
+
+expected_values = empty_grid %>%
+  add_epred_draws(mean_decel_skewnormal_reg_priors_maximal)
+
+# labels
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+posterior_mean_decel <- response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+  ggplot(aes(x = mean_decel, y = n_back)) +
+  stat_pointinterval(aes(x = .epred), data = expected_values, .width = c(.50, .95), position = position_nudge(y = -0.35)) +
+  stat_interval(aes(x = .prediction), data = predicted_draws, .width = c(.50, .80, .95, .99)) +
+  geom_jitter(data = response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)), size = 2, height = .05, alpha = .3) +
+  #geom_point(conditional_df_fitted[[3]], mapping = aes(x = estimate__, y = n_back), col = "white") +
+  scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
+  scale_color_brewer("Posterior predictive interval") +
+  ggtitle("A") +
+  xlim(-7, 0) +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  ylab(" ") +
+  #scale_x_continuous(limits = c(0, 3.5), breaks = seq(0, 3, .5), labels = label_number(accuracy = .5)) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
+
+# predicted mean decelerations
+predicted_mean_decel_ttc_plot <- ggplot(predicted_mean_decel_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+  stat_halfeye(alpha = .5) +
+  ylab(NULL) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ M[D] ~ "("~m/s^2~")")) +
+  ggtitle("B") +
+  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  xlim(-4, -.5) +
+  theme_bw() +
+  theme(legend.position = c(.88, .57), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+
+# MER of TTC on mean deceleration
+mean_decel_MER_TTC_plot <- ggplot(mean_decel_MER_TTC, aes(x = .value, y = " ")) +
+  stat_halfeye() +
+  ylab(NULL) +
+  xlab(expression(MER[M[D]]~ "("~m/s^2~")" ~ "of TTC")) +
+  ggtitle("C") +
+  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  theme_bw() +
+  theme(legend.position = c(.93, .62), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+fig6 <- posterior_mean_decel / (predicted_mean_decel_ttc_plot | mean_decel_MER_TTC_plot)
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig6.tiff"), plot = fig6, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+```
+
 ## Modelling - mean lateral accelerations
 
 ```{r}
@@ -570,7 +658,6 @@ ggplot(response.vehicle.eye %>%
          dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0), mapping = aes(x = mean_lat_acc)) +
   geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") +
   facet_grid(n_back ~ ttc_criticality.x)
-
 
 # load model
 mean_lat_acc_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_lat_acc_lognormal_maximal.rds"))
@@ -594,43 +681,40 @@ pp_check(mean_lat_acc_lognormal_maximal, type = "stat_grouped", stat = "mean", g
 
 pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
 pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+```
 
+## Mean lateral accelerations: model predictions
 
+```{r}
 print(summary(mean_lat_acc_lognormal_maximal), digits = 5)
 describe_posterior(mean_lat_acc_lognormal_maximal, centrality = "mean")
 
-# effect of event critcality
-grand_mean_ttc_ame_max_la <- mod_max_lat_bayesian_lognormal %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
+# predicted lateral accelerations across all conditions
+predicted_lat_acc_ttc <- mean_lat_acc_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = c(FALSE, TRUE)),
+              re_formula = NA)
 
-grand_mean_ttc_ame_max_la %>% mean_hdi()
+predicted_lat_acc_ttc %>% mean_hdi()
+```
 
-# effect of n-back
-grand_mean_ttc_ame_max_la <- mod_max_lat_bayesian_lognormal %>% 
-  emmeans(~ n_back,
-          at = list(ttc_criticality_factor = as.factor(5)),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
+## Mean lateral accelerations  - visualising posterior draws and means
 
-grand_mean_ttc_ame_max_la %>% mean_hdi()
+```{r}
+avg_lat_acc <- fread(file = here::here("takeover_performance_cogload_time_budget/Data/avg_lat_acc.csv"))
 
 #### predicted posterior means and distribution ####
 predicted_draws = empty_grid %>%
-  add_predicted_draws(mod_max_lat_bayesian_lognormal)
+  add_predicted_draws(mean_lat_acc_lognormal_maximal)
 
 expected_values = empty_grid %>%
-  add_epred_draws(mod_max_lat_bayesian_lognormal)
+  add_epred_draws(mean_lat_acc_lognormal_maximal)
 
-posterior_max_lat <- response.vehicle.eye %>%
+posterior_mean_lat_acc <- response.vehicle.eye %>%
   dplyr::ungroup() %>%
   dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0) %>%
   dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-  ggplot(aes(x = max_lat, y = n_back)) +
+  ggplot(aes(x = mean_lat_acc, y = n_back)) +
   stat_pointinterval(aes(x = .epred), data = expected_values, .width = c(.50, .95), position = position_nudge(y = -0.35)) +
   stat_interval(aes(x = .prediction), data = predicted_draws, .width = c(.50, .80, .95, .99)) +
   geom_jitter(data = response.vehicle.eye %>%
@@ -641,8 +725,8 @@ posterior_max_lat <- response.vehicle.eye %>%
   scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
   ggtitle("A") +
   scale_color_brewer("Posterior predictive interval") +
-  xlim(0, 10) +
-  xlab(expression(MAX[LA] ~"("~m/s^2~")")) +
+  xlim(0, 1.25) +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
   ylab(" ") +
   #scale_x_continuous(breaks = seq(0, .8, .2), labels = label_number(accuracy = 0.01)) +
   facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
@@ -650,32 +734,21 @@ posterior_max_lat <- response.vehicle.eye %>%
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))  
 
 
-avg_lat_acc <- ggplot(critical.manual %>%
-         dplyr::arrange(trialid, timestamp_common_manual) %>%
-         dplyr::group_by(n_back, ttc_criticality, timestamp_common_manual) %>%
-         dplyr::summarise(lat_acc = mean(latacc)) %>%
-         dplyr::ungroup(), mapping = aes(x = timestamp_common_manual, y = lat_acc, col = as.factor(ttc_criticality))) +
+avg_lat_acc_plot <- ggplot(avg_lat_acc, mapping = aes(x = timestamp_common_manual, y = lat_acc, col = as.factor(n_back))) +
   geom_path() +
   ggtitle("B") +
   ylab(expression("LA ("~m/s^2~")")) +
   xlab("Time (s)") +
-  scale_color_discrete(name = "TTC", labels = c("3 s", "5 s")) +
-  facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
+  facet_wrap(~ ttc_criticality) +
+  scale_color_manual(name = " ", labels = c("No N-back", "N-back"), values = viridis(3)[1:2]) +
+  facet_wrap(~ ttc_criticality, labeller = labeller(ttc_criticality = ttc_labs)) +
   theme_bw() +
-  theme(legend.position = c(.35, .21), legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.703, .21), legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig6 <- posterior_max_lat / avg_lat_acc
+fig7 <- posterior_mean_lat_acc / avg_lat_acc_plot
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig6.tiff"), plot = fig6, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
-
-# predicted means for max lat
-grand_mean_n_back_dist <- mod_max_lat_bayesian_lognormal %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig7.tiff"), plot = fig7, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 ## SDLP
