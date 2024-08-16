@@ -11,10 +11,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 The code in this script produces the plots and model for the following manuscript:
 
+# Packages
 
-## Packages
-
-Here we load the packages that will be used for this analysis
+Loading packages that will be used for this analysis
 
 ```{r}
 if(!require(here)) install.packages("here")
@@ -111,7 +110,7 @@ if(!require(ggforce)) install.packages("ggforce")
 library(ggforce)
 ```
 
-## Load vehicle data
+# Load vehicle data
 
 This provides timing responses to takeovers and collision data. We also remove participants that were removed in the gaze entropy analysis. 
 
@@ -130,7 +129,7 @@ response.vehicle.eye <- response.vehicle.eye %>%
                                       collision == FALSE ~ 0))
 ```
 
-## Loading participant information
+# Load participant information
 
 ```{r}
 # select demographic data such as age, annual miles driven, years with license
@@ -175,7 +174,7 @@ response.vehicle.eye <-  response.vehicle.eye %>%
   dplyr::mutate(ho.outlier = ho.rt > mean_4_sd)
 ```
 
-# Number of participants
+# Participants demographics
 
 ```{r}
 response.vehicle.eye %>%
@@ -184,6 +183,14 @@ response.vehicle.eye %>%
   dplyr::slice(1) %>%
   dplyr::ungroup() %>%
   dplyr::summarise(avg = mean(age), min_age = min(age), max_age = max(age), mean_milage = mean(Approximate.Annual.Mileage..Miles.), min_mileage = min(Approximate.Annual.Mileage..Miles.), max_mileage = max(Approximate.Annual.Mileage..Miles.), mean_license = mean(No..of.years.holding.a.full.UK.driving.license), min_license = min(No..of.years.holding.a.full.UK.driving.license), max_license = max(No..of.years.holding.a.full.UK.driving.license), N = n()) %>%
+  View()
+
+response.vehicle.eye %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::group_by(ppid) %>%
+  dplyr::slice(1) %>%
+  dplyr::group_by(Gender) %>%
+  dplyr::summarise(n = n()) %>%
   View()
 ```
 
@@ -231,10 +238,12 @@ pp_check(braking_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", gr
 
 # Braking RT - model predictions
 
-Calculating predicted braking RT implied by the model parameters, and the average effect of time budget on braking RT
+Calculating predicted braking RT implied by the model parameters, and the average effect of time budget on braking RT.
+
+The tutorial I use to help calculate these model predictions: https://www.andrewheiss.com/blog/2021/11/10/ame-bayes-re-guide/#different-kinds-of-average-predictions-with-multilevel-models 
 
 ```{r}
-# average effect of TTC on braking RT 
+# calculating the marginal effect of TTC on braking RT 
 braking_rt_MER_TTC <- braking_rt_shifted_lognormal_maximal %>% 
   emmeans(~ ttc_criticality_factor,
           at = list(n_back = FALSE),
@@ -255,7 +264,7 @@ predicted_braking_rt_ttc %>% mean_hdi()
 
 # Braking RT - visualising posterior draws and means
 
-In the chunk below, I plot the posterior expected values alongside the distributions, over the raw data. The function *data_grid()* produces an empty dataframe from which to generate predictions from bthe model (https://mjskay.github.io/tidybayes/articles/tidy-brms.html)
+In the chunk below, I plot the posterior expected values alongside the distributions, over the raw data. The function *data_grid()* produces an empty dataframe from which to generate predictions from the model (https://mjskay.github.io/tidybayes/articles/tidy-brms.html)
 
 ```{r}
 # Creates long format data frame of each participant within each condition. This is new data from which we can make some predictions regarding the effects of n-back and and ttc
@@ -634,7 +643,6 @@ predicted_mean_decel_ttc_plot <- ggplot(predicted_mean_decel_ttc, aes(x = .epred
   theme_bw() +
   theme(legend.position = c(.88, .57), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-
 # MER of TTC on mean deceleration
 mean_decel_MER_TTC_plot <- ggplot(mean_decel_MER_TTC, aes(x = .value, y = " ")) +
   stat_halfeye() +
@@ -696,9 +704,25 @@ predicted_lat_acc_ttc <- mean_lat_acc_lognormal_maximal %>%
               re_formula = NA)
 
 predicted_lat_acc_ttc %>% mean_hdi()
+
+# marginal effect of TTC when N-back is FALSE
+lat_acc_MER_TTC_noNback <- mean_lat_acc_lognormal_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+# marginal effect of TTC when N-back is TRUE
+lat_acc_MER_TTC_Nback <- mean_lat_acc_lognormal_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = TRUE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
 ```
 
-## Mean lateral accelerations  - visualising posterior draws and means
+## Mean lateral accelerations - visualising posterior draws and means
 
 ```{r}
 avg_lat_acc <- fread(file = here::here("takeover_performance_cogload_time_budget/Data/avg_lat_acc.csv"))
@@ -731,12 +755,28 @@ posterior_mean_lat_acc <- response.vehicle.eye %>%
   #scale_x_continuous(breaks = seq(0, .8, .2), labels = label_number(accuracy = 0.01)) +
   facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
   theme_bw() +
-  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))  
+  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
+# labels - n-back
+l.labs <- c("No N-back", "N-back")
+names(l.labs) <- c("FALSE", "TRUE")
 
+# predicted mean lateral accelerations
+predicted_lat_acc_ttc_plot <- ggplot(predicted_lat_acc_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+  stat_halfeye(alpha = .5) +
+  ylab(NULL) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ M[LA] ~ "("~m/s^2~")")) +
+  ggtitle("B") +
+  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  xlim(.1, .4) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
+  theme_bw() +
+  theme(legend.position = c(.945, .58), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# average lateral accelerations over time
 avg_lat_acc_plot <- ggplot(avg_lat_acc, mapping = aes(x = timestamp_common_manual, y = lat_acc, col = as.factor(n_back))) +
   geom_path() +
-  ggtitle("B") +
+  ggtitle("C") +
   ylab(expression("LA ("~m/s^2~")")) +
   xlab("Time (s)") +
   facet_wrap(~ ttc_criticality) +
@@ -745,13 +785,13 @@ avg_lat_acc_plot <- ggplot(avg_lat_acc, mapping = aes(x = timestamp_common_manua
   theme_bw() +
   theme(legend.position = c(.703, .21), legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig7 <- posterior_mean_lat_acc / avg_lat_acc_plot
+fig7 <- posterior_mean_lat_acc / predicted_lat_acc_ttc_plot
 
 # plot saving
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig7.tiff"), plot = fig7, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig7.tiff"), plot = fig7, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-## SDLP
+# SDLP: model fitting 
 
 ```{r}
 # SDLP - distributions
@@ -776,9 +816,6 @@ sdlp_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                    iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                    file = here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal"))
 
-print(summary(sdlp_lognormal_maximal), digits = 5)
-describe_posterior(sdlp_lognormal_maximal, centrality = "mean")
-
 pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
 pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 
@@ -786,37 +823,43 @@ pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back"
 pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 
 pp_check(sdlp_lognormal_maximal, type = "hist", group = "ttc_criticality_factor")
+```
 
-# initial model of SDLP
-sdlp_skew_normal_maximal <- brm(data = response.vehicle.eye %>%
-                                  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
-                                  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                  dplyr::mutate(ppid = as.factor(ppid)),
-                              family = skew_normal(),
-                              prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                        prior(student_t(3, 0, 2.5), class = "b")),
-                              bf(sdlp ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
-                                   control = list(adapt_delta = 0.95),
-                                   iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                                   file = here::here("takeover_performance_cogload_time_budget/Models/sdlp_skew_normal_maximal"))
+# SDLP: model predictions
 
-print(summary(sdlp_skew_normal_maximal), digits = 5)
-describe_posterior(sdlp_skew_normal_maximal, centrality = "mean")
-
-pp_check(sdlp_skew_normal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(sdlp_skew_normal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(sdlp_skew_normal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(sdlp_skew_normal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
+```{r}
+print(summary(sdlp_lognormal_maximal), digits = 5)
+describe_posterior(sdlp_lognormal_maximal, centrality = "mean")
 
 #### predicted posterior means and distribution ####
 predicted_draws = empty_grid %>%
-  add_predicted_draws(mod_sdlp_bayesian_lognormal_priors)
+  add_predicted_draws(sdlp_lognormal_maximal)
 
 expected_values = empty_grid %>%
-  add_epred_draws(mod_sdlp_bayesian_lognormal_priors)
+  add_epred_draws(sdlp_lognormal_maximal)
 
+#### Global mean effect of TTC #### # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
+predicted_SDLP_ttc <- sdlp_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_SDLP_ttc  %>% mean_hdi()
+
+# effect of TTC on SDLP when N-back is not TRUE
+SDLP_MER_TTC <- sdlp_lognormal_maximal%>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+SDLP_MER_TTC %>% mean_hdi()
+```
+
+# SDLP: visualising posterior draws and means
+
+```{r}
 # labels
 ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
 names(ttc_labs) <- c(as.factor(3), as.factor(5))
@@ -844,51 +887,18 @@ posterior_sdlp <- response.vehicle.eye %>%
   theme_bw() +
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
-
-# predicted global mean RTs implied by the model
-
-# setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-grand_mean_n_back_dist <- mod_sdlp_bayesian_lognormal_priors %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-global_mean_ttc_SDLP <- ggplot(grand_mean_n_back_dist ,aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+# predicted means of SDLP
+predicted_SDLP_ttc_plot <- ggplot(predicted_SDLP_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
   ylab(NULL) +
-  xlab(expression("Predicted mean"~ SD[LP]~ "(m)")) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ SD[LP]~ "(m)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
   theme(legend.position = c(.88, .6), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-# and now we plot the distribution of the difference between n_back and no n-back 
-grand_mean_n_back_mer <- mod_sdlp_bayesian_lognormal_priors %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_mer %>% mean_hdi()
-
-
-
-grand_mean_n_back_mer <- mod_sdlp_bayesian_lognormal_priors %>% 
-  emmeans(~ n_back,
-          at = list(ttc_criticality_factor = as.factor(5)),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_mer %>% mean_hdi()
-
-
-
-# Average marginal effect (AME) of TTC on braking RT
-MER_ttc_SDLP <- ggplot(grand_mean_n_back_mer, aes(x = .value, y = " ")) +
+# Average marginal effect of TTC on SDLP
+SDLP_MER_TTC_plot <- ggplot(SDLP_MER_TTC, aes(x = .value, y = " ")) +
   stat_halfeye() +
   ylab(NULL) +
   xlab(expression(MER[SD[LP]]~ "(m) of TTC")) +
@@ -897,50 +907,13 @@ MER_ttc_SDLP <- ggplot(grand_mean_n_back_mer, aes(x = .value, y = " ")) +
   theme_bw() +
   theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig7 <- posterior_sdlp / (global_mean_ttc_SDLP | MER_ttc_SDLP)
+fig8 <- posterior_sdlp / (predicted_SDLP_ttc_plot | SDLP_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig7.tiff"), plot = fig7, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig8.tiff"), plot = fig8, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-## Loading model for SD of horizontal gaze during manual driving
-
-```{r}
-# SDLP - distributions
-ggplot(response.vehicle.eye %>%
-                dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15), mapping = aes(x = sd_yaw_manual)) +
-  geom_histogram(alpha = 0.5, bins = 50, col = "black") + 
-  xlab("SD yaw") +
-  facet_wrap(n_back ~ ttc_criticality.x) 
-
-sd_yaw_manual_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal.rds"))
-
-# initial model of sd_yaw
-sd_yaw_manual_gaussian_maximal <- brm(data = response.vehicle.eye %>%
-                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
-                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                             dplyr::mutate(ppid = as.factor(ppid)),
-                           family = gaussian(),
-                           bf(sd_yaw_manual ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
-                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                     prior(student_t(3, 0, 2.5), class = "b")),
-                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
-                           control = list(adapt_delta = 0.95),
-                           file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal"))
-
-# posterior predictive checks
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-print(summary(sd_yaw_manual_gaussian_maximal), digits = 5)
-describe_posterior(sd_yaw_manual_gaussian_maximal)
-```
-
-## Modelling SD yaw during automation
+# SD of horitzonal gaze during automation: model fitting
 
 ```{r}
 # SDLP - distributions
@@ -964,46 +937,38 @@ sd_yaw_automation_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                                    file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_gaussian_maximal"))
 
-# model summmary
-print(summary(sd_yaw_automation_gaussian_maximal), digits = 5)
-describe_posterior(sd_yaw_automation_gaussian_maximal)
 
 # posterior predictive checks
 pp_check(sd_yaw_automation_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 pp_check(sd_yaw_automation_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+```
+
+# SD of horitzonal gaze during automation: model predictions
+
+```{r}
+# model summmary
+print(summary(sd_yaw_automation_gaussian_maximal), digits = 5)
+describe_posterior(sd_yaw_automation_gaussian_maximal, centrality = "mean")
 
 
 # average predicted SD of yaw during automation with and without n-back
-sd_yaw_automation_n_back_dist <- mod_sd_yaw_automation_gaussian %>% 
+predicted_sd_yaw_automation_nback <- sd_yaw_automation_gaussian_maximal %>% 
   epred_draws(newdata = expand_grid(n_back = c(TRUE, FALSE)),
               re_formula = NA)
 
-sd_yaw_automation_n_back_dist %>% mean_hdi()
+predicted_sd_yaw_automation_nback %>% mean_hdi()
 
-# average effect
-sd_yaw_automation_n_back_mer <- mod_sd_yaw_automation_gaussian %>% 
+# average marginal effect of n-back
+sd_yaw_automation_MER_nback <- sd_yaw_automation_gaussian_maximal %>% 
   emmeans(~ n_back,
           epred = TRUE, re_formula = NA) %>% 
   contrast(method = "revpairwise") %>% 
   gather_emmeans_draws()
 
-sd_yaw_automation_n_back_mer %>% mean_hdi()
-
-
-
-# 
-prior(student_t(3, -2, 2.5)) %>% 
-  parse_dist() %>% 
-  ggplot(aes(xdist = .dist_obj, y = prior)) + 
-  stat_halfeye(.width = c(.5, .99)) +
-  scale_y_discrete(NULL, breaks = NULL, expand = expansion(add = 0.1)) +
-  scale_x_continuous(expression(italic(p)(beta[1]))) +
-  theme_bw()
-
-
+sd_yaw_automation_MER_nback  %>% mean_hdi()
 ```
 
-## Plotting SD of horizontal/vertical gaze data
+# SD of horitzonal gaze during automation: dispersion plots
 
 ```{r}
 # labels - n-back
@@ -1193,14 +1158,154 @@ n_back_FALSE_automation <- ggplot(dat.eye.automation %>%
         plot.title = element_text(size = 15, face = "bold"), 
         strip.text = element_text(face = "bold", size = 10)) 
 
-n_back_automation_disp <- n_back_FALSE_automation + n_back_TRUE_automation + plot_layout(axes = "collect")
+fig9 <- n_back_FALSE_automation + n_back_TRUE_automation + plot_layout(axes = "collect")
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/n_back_automation_disp.tiff"), plot = n_back_automation_disp, width = 16, height = 8, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig9.tiff"), plot = fig9, width = 16, height = 8, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## SD of horizontal gaze during manual driving: model fitting
+
+```{r}
+# distributions
+ggplot(response.vehicle.eye %>%
+                dplyr::filter(rt.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15), mapping = aes(x = sd_yaw_manual)) +
+  geom_histogram(alpha = 0.5, bins = 50, col = "black") + 
+  xlab("SD yaw") +
+  facet_wrap(n_back ~ ttc_criticality.x) 
+
+sd_yaw_manual_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal.rds"))
+
+# initial model of sd_yaw
+sd_yaw_manual_gaussian_maximal <- brm(data = response.vehicle.eye %>%
+                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                             dplyr::mutate(ppid = as.factor(ppid)),
+                           family = gaussian(),
+                           bf(sd_yaw_manual ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
+                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                     prior(student_t(3, 0, 2.5), class = "b")),
+                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
+                           control = list(adapt_delta = 0.95),
+                           file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal"))
+
+# posterior predictive checks
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+```
+
+## SD of horizontal gaze during manual driving: model predictions
+
+```{r}
+print(summary(sd_yaw_manual_gaussian_maximal), digits = 5)
+describe_posterior(sd_yaw_manual_gaussian_maximal, centrality = "mean")
+
+#### predicted posterior means and distribution ####
+predicted_draws = empty_grid %>%
+  add_predicted_draws(sd_yaw_manual_gaussian_maximal)
+
+expected_values = empty_grid %>%
+  add_epred_draws(sd_yaw_manual_gaussian_maximal)
+
+# predicted mean SD yaw  implied by the model as a function of TTC # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
+predicted_sd_yaw_manual_ttc <- sd_yaw_manual_gaussian_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_sd_yaw_manual_ttc %>% mean_hdi()
+
+# margainal effect of TTC for SD of yaw
+sd_yaw_manual_MER_TTC <- sd_yaw_manual_gaussian_maximal %>% 
+  emmeans(~ ttc_criticality_factor,
+          at = list(n_back = FALSE),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+sd_yaw_manual_MER_TTC %>% mean_hdi()
 
 
+## predicted means for the effect of n-back on SD yaw
+predicted_sd_yaw_manual_nback <- sd_yaw_manual_gaussian_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3)),
+                                    n_back = c(FALSE, TRUE)),
+              re_formula = NA)
+
+predicted_sd_yaw_manual_nback  %>% mean_hdi()
+
+# marginal effect of N-back of SD of yaw during manual driving
+sd_yaw_manual_MER_nback <- sd_yaw_manual_gaussian_maximal %>% 
+  emmeans(~ n_back,
+          at = list(ttc_criticality_factor = as.factor(3)),
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+sd_yaw_manual_MER_nback %>% mean_hdi()
+```
+
+## SD of horizontal gaze during manual driving: visualising posteriors and means
+
+```{r}
+# posterior distribution
+posterior_sdyaw <- response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+  ggplot(aes(x = sd_yaw_manual, y = n_back)) +
+  stat_pointinterval(aes(x = .epred), data = expected_values, .width = c(.50, .95), position = position_nudge(y = -0.35)) +
+  stat_interval(aes(x = .prediction), data = predicted_draws, .width = c(.50, .80, .95, .99)) +
+  geom_jitter(data = response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)), size = 2, height = .05, alpha = .3) +
+  #geom_point(conditional_df_fitted[[3]], mapping = aes(x = estimate__, y = n_back), col = "white") +
+  scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
+  scale_color_brewer("Posterior predictive interval") +
+  ggtitle("A") +
+  #xlim(.5, 3.5) +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  ylab(" ") +
+  #xlim(0, 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
+
+# predicted means
+predicted_sd_yaw_manual_ttc_plot <- ggplot(predicted_sd_yaw_manual_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+  stat_halfeye(alpha = .5) +
+  ylab(NULL) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ SD[YAW]~ "(°)")) +
+  ggtitle("B") +
+  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  xlim(8, 14) +
+  theme_bw() +
+  theme(legend.position = c(.88, .6), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# Average marginal effect for SD of yaw
+sd_yaw_manual_MER_TTC_plot <- ggplot(sd_yaw_manual_MER_TTC, aes(x = .value, y = " ")) +
+  stat_halfeye() +
+  ylab(NULL) +
+  xlab(expression(MER[SD[YAW]]~ "(°)")) +
+  ggtitle("C") +
+  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  theme_bw() +
+  theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+fig10 <- posterior_sdyaw / (predicted_sd_yaw_manual_ttc_plot | sd_yaw_manual_MER_TTC_plot)
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig10.tiff"), plot = fig10, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+# SD of horitzonal gaze during manual: dispersion plots
+
+```{r}
 # gaze concentration during manual driving
-
 n_back_ttc_manual_disp_ttc5 <- ggplot(dat.eye.manual %>%
                                    dplyr::filter(ttc_criticality == 5), mapping = aes(x = yaw, y = pitch)) +
   geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
@@ -1317,120 +1422,17 @@ n_back_ttc_manual_disp_ttc3 <- ggplot(dat.eye.manual %>%
         strip.text = element_text(face = "bold", size = 10))
 
 
-n_back_ttc_manual_disp <- n_back_ttc_manual_disp_ttc3 / n_back_ttc_manual_disp_ttc5 + plot_layout(axes = "collect")
+fig11 <- n_back_ttc_manual_disp_ttc3 / n_back_ttc_manual_disp_ttc5 + plot_layout(axes = "collect")
 
 # plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/n_back_ttc_manual_disp.tiff"), plot = n_back_ttc_manual_disp, width = 16, height = 16, units = 'cm', dpi = 300, type = 'cairo')
-
-
-#### predicted posterior means and distribution ####
-predicted_draws = empty_grid %>%
-  add_predicted_draws(mod_sd_yaw_gaussian)
-
-expected_values = empty_grid %>%
-  add_epred_draws(mod_sd_yaw_gaussian)
-
-posterior_sdyaw <- response.vehicle.eye %>%
-  dplyr::ungroup() %>%
-  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
-  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-  ggplot(aes(x = sd_yaw, y = n_back)) +
-  stat_pointinterval(aes(x = .epred), data = expected_values, .width = c(.50, .95), position = position_nudge(y = -0.35)) +
-  stat_interval(aes(x = .prediction), data = predicted_draws, .width = c(.50, .80, .95, .99)) +
-  geom_jitter(data = response.vehicle.eye %>%
-  dplyr::ungroup() %>%
-  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
-  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)), size = 2, height = .05, alpha = .3) +
-  #geom_point(conditional_df_fitted[[3]], mapping = aes(x = estimate__, y = n_back), col = "white") +
-  scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
-  scale_color_brewer("Posterior predictive interval") +
-  ggtitle("A") +
-  #xlim(.5, 3.5) +
-  xlab(expression(SD[YAW]~ "(°)")) +
-  ylab(" ") +
-  #xlim(0, 2) +
-  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
-  theme_bw() +
-  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
-
-
-
-# predicted global mean RTs implied by the model
-
-# setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-grand_mean_ttc_dist <- mod_sd_yaw_gaussian %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
-                                    n_back = FALSE),
-              re_formula = NA)
-
-grand_mean_ttc_dist %>% mean_hdi()
-
-global_mean_ttc_sdyaw <- ggplot(grand_mean_ttc_dist ,aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
-  stat_halfeye(alpha = .5) +
-  ylab(NULL) +
-  xlab(expression("Predicted mean"~ SD[YAW]~ "(°)")) +
-  ggtitle("B") +
-  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
-  xlim(8, 14) +
-  theme_bw() +
-  theme(legend.position = c(.88, .6), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
-
-# and now we plot the distribution of the difference between n_back and no n-back 
-grand_mean_ttc_mer <- mod_sd_yaw_gaussian %>% 
-  emmeans(~ ttc_criticality_factor,
-          at = list(n_back = FALSE),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_ttc_mer %>% mean_hdi()
-
-# Average marginal effect (AME) of TTC on braking RT
-MER_ttc_sdyaw <- ggplot(grand_mean_ttc_mer, aes(x = .value, y = " ")) +
-  stat_halfeye() +
-  ylab(NULL) +
-  xlab(expression(MER[SD[YAW]]~ "(°)")) +
-  ggtitle("C") +
-  scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
-  theme_bw() +
-  theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
-
-fig8 <- posterior_sdyaw / (global_mean_ttc_sdyaw  | MER_ttc_sdyaw)
-
-# plot saving
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig8.tiff"), plot = fig8, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
-
-
-## effect of n-back on SD yaw
-grand_mean_n_back_dist <- mod_sd_yaw_gaussian %>% 
-  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3)),
-                                    n_back = c(FALSE, TRUE)),
-              re_formula = NA)
-
-grand_mean_n_back_dist %>% mean_hdi()
-
-grand_mean_n_back_mer <- mod_sd_yaw_gaussian %>% 
-  emmeans(~ n_back,
-          at = list(ttc_criticality_factor = as.factor(3)),
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-grand_mean_n_back_mer  %>% mean_hdi()
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig11.tiff"), plot = fig11, width = 16, height = 16, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
-## Individual variation of SD of yaw
-
-
-## TO DO
-
-- MAKE TITLES ON GZE SUBPLOTS A NORMAL SIZE
-- PUT ARROWS ON STRIP PLOT
-- CLEAN UP CODE SCRIPT FOR PUBLICATION
+# SD of horitzonal gaze during manual: individual dispersion plots
 
 ```{r}
 # relative size of  heterogenity effect for 2-back on mu
-summary(mod_sd_yaw_gaussian)[["random"]][["ppid"]][2,1] / summary(mod_sd_yaw_gaussian)[["fixed"]][2,1]
+summary(sd_yaw_manual_gaussian_maximal)[["random"]][["ppid"]][2,1] / summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1]
 
 # removing outliers and collisions from a specific dataframe
 response.vehicle.eye.removed <- response.vehicle.eye %>%
@@ -1438,20 +1440,19 @@ response.vehicle.eye.removed <- response.vehicle.eye %>%
   dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt >.15) %>%
   dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x), ppid = as.factor(ppid))
 
-
 # individual effects for SD of yaw during manual driving
-ppid.effects <- as.data.frame(ranef(mod_sd_yaw_gaussian)) %>%
+ppid.effects <- as.data.frame(ranef(sd_yaw_manual_gaussian_maximal)) %>%
   dplyr::select(ppid.Estimate.n_backTRUE) %>%
-  dplyr::mutate(ranef = ppid.Estimate.n_backTRUE + summary(mod_sd_yaw_gaussian)[["fixed"]][2,1]) %>%
+  dplyr::mutate(ranef = ppid.Estimate.n_backTRUE + summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1]) %>%
   tibble::rownames_to_column("ppid")
 
 ppid.effects$x <- 0
 
 # CI interval for average effect
-bayes.credible.intervals <- as.data.frame(summary(mod_sd_yaw_gaussian)[["fixed"]][3:4])
+bayes.credible.intervals <- as.data.frame(summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][3:4])
 
 # select random effects parameter 
-ran.effects <- summary(mod_sd_yaw_gaussian)[["random"]][["ppid"]][2,1]
+ran.effects <- summary(sd_yaw_manual_gaussian_maximal)[["random"]][["ppid"]][2,1]
 
 # strip plot of individual effects
 strip_plot <- ggplot() +
@@ -1464,9 +1465,9 @@ strip_plot <- ggplot() +
   xlim(-1, 1) +
   geom_hline(aes(yintercept = bayes.credible.intervals$`l-95% CI`[2], linetype ="95% CI"), size = 1.5,  color = viridis(5)[3]) +
   geom_hline(aes(yintercept = bayes.credible.intervals$`u-95% CI`[2], linetype="95% CI"), size = 1.5,  color = viridis(5)[3]) +
-  geom_hline(aes(yintercept = summary(mod_sd_yaw_gaussian)[["fixed"]][2,1], linetype = "beta_1"), size = 1.5, color = "black") +
-  geom_hline(aes(yintercept = summary(mod_sd_yaw_gaussian)[["fixed"]][2,1] + 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
-  geom_hline(aes(yintercept = summary(mod_sd_yaw_gaussian)[["fixed"]][2,1] - 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1], linetype = "beta_1"), size = 1.5, color = "black") +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
   scale_linetype_manual(name = " ", values = c(2, 1, 1), labels = c(expression(CI[95]), expression(HI[95]), expression(beta[N])), guide = guide_legend(override.aes = list(color = c(viridis(5)[3], viridis(5)[2], "black")))) +
   scale_fill_manual(name = "Parameter", values = c(viridis(5)[2])) +
    annotate( # increased gaze concentration
@@ -1494,8 +1495,8 @@ strip_plot <- ggplot() +
   theme(legend.position = c(.181, .60), panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),legend.key = element_blank(), legend.key.width = unit(0.2, 'cm'), axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.key.size = unit(.05, 'cm'), plot.title = element_text(size = 15, face = "bold"), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), title = element_text(size = 7), legend.title = element_text(size = 11), legend.text = element_text(size = 7)) 
 
 # heterogenity intervals for the effect of N-back on SD of yaw during manual driving
-summary(mod_sd_yaw_gaussian)[["fixed"]][2,1] + 1.96 * ran.effects
-summary(mod_sd_yaw_gaussian)[["fixed"]][2,1] - 1.96 * ran.effects
+summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects
+summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects
 
 
 # participant 3, beta_n = -0.065
@@ -1505,7 +1506,7 @@ p_3 <- ggplot(dat.eye.manual %>%
   facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
   scale_colour_viridis_c(option = "C") +
   ggtitle(label = "B",
-          subtitle = "Participant 3," ~ beta[N[14]] ~ "= -.065") +
+          subtitle = "Participant 3," ~ beta[N[3]] ~ "= -.065") +
   xlab("Yaw (°)") +
   ylab("Pitch (°)") +
   xlim(-50, 50) +
@@ -1594,8 +1595,8 @@ p_13 <- ggplot(dat.eye.manual %>%
         plot.subtitle = element_text(size = 12, colour = turbo(5)[5]))
 
 
-fig99 <- strip_plot / (p_3 | p_14) / (p_7 | p_13)
+fig12 <- strip_plot / (p_3 | p_14) / (p_7 | p_13)
   
-ggsave(here::here("ITS/Work package 6.5 (HiDrive)/TME study/Analysis/Plots/manuscript_plots/fig99.tiff"), plot = fig99, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.tiff"), plot = fig12, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
 ```
 

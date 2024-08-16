@@ -1,0 +1,30 @@
+---
+title: "Supplemental material"
+author: "Courtney Goodridge"
+date: "16/08/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Supplemental material
+
+This analysis script contains analysis and plotting for the supplemental material associated with the following manuscript:
+
+
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
