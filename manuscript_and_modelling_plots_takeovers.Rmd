@@ -289,7 +289,6 @@ ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
 names(ttc_labs) <- c(as.factor(3), as.factor(5))
 
 # expected values and model predicted means
-
 posterior_braking_rt <- response.vehicle.eye %>%
   dplyr::ungroup() %>%
   dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0) %>%
@@ -324,7 +323,6 @@ predicted_braking_rt_ttc_plot <- ggplot(predicted_braking_rt_ttc, aes(x = .epred
   theme_bw() +
   theme(legend.position = c(.87, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-
 # Marginal Effects at Representative values (MER) of TTC on braking RT
 braking_rt_MER_TTC_plot <- ggplot(braking_rt_MER_TTC, aes(x = .value, y = " ")) +
   stat_halfeye() +
@@ -338,7 +336,7 @@ braking_rt_MER_TTC_plot <- ggplot(braking_rt_MER_TTC, aes(x = .value, y = " ")) 
 fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 # Hands-on time: model fitting
