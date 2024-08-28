@@ -377,8 +377,6 @@ pp_check(handson_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "me
 pp_check(handson_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
 pp_check(handson_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
 
-
-
 ```
 
 # Hands-on steering time: model predictions
@@ -468,7 +466,7 @@ ho_rt_MER_TTC_plot <- ggplot(ho_rt_MER_TTC, aes(x = .value, y = " ")) +
 fig5 <- posterior_ho_rt / (predicted_ho_rt_ttc_plot | ho_rt_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig5.tiff"), plot = fig5, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig5.tiff"), plot = fig5, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 ## Mean decelerations - model fitting
@@ -654,7 +652,7 @@ mean_decel_MER_TTC_plot <- ggplot(mean_decel_MER_TTC, aes(x = .value, y = " ")) 
 fig6 <- posterior_mean_decel / (predicted_mean_decel_ttc_plot | mean_decel_MER_TTC_plot)
 
 # plot saving
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig6.tiff"), plot = fig6, width = 16, height = 11, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig6.tiff"), plot = fig6, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 ## Modelling - mean lateral accelerations
