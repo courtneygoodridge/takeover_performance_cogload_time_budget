@@ -14,17 +14,261 @@ knitr::opts_chunk$set(echo = TRUE)
 This analysis script contains analysis and plotting for the supplemental material associated with the following manuscript:
 
 
+## Packages
 
-```{r cars}
-summary(cars)
+```{r}
+if(!require(here)) install.packages("here")
+library(here)
+
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+
+if(!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+
+if(!require(tidyr)) install.packages("tidyr")
+library(tidyr)
+
+if(!require(viridis)) install.packages("viridis")
+library(viridis)
+
+if(!require(gridExtra)) install.packages("gridExtra")
+library(gridExtra)
+
+if(!require(readr)) install.packages("readr")
+library(readr)
+
+if(!require(plyr)) install.packages("plyr")
+library(plyr)
+
+if(!require(stringr)) install.packages("stringr")
+library(stringr)
+
+if(!require(readxl)) install.packages("readxl")
+library(readxl)
+
+if(!require(data.table)) install.packages("data.table")
+library(data.table)
+
+if(!require(xfun)) install.packages("xfun")
+library(xfun)
+
+if(!require(cowplot)) install.packages("cowplot")
+library(cowplot)
+
+if(!require(gganimate)) install.packages("gganimate")
+library(gganimate)
+
+if(!require(ggExtra)) install.packages("ggExtra")
+library(ggExtra)
+
+if(!require(plotly)) install.packages("plotly")
+library(plotly)
+
+if(!require(brms)) install.packages("brms")
+library(brms)
+
+if(!require(bayestestR)) install.packages("bayestestR")
+library(bayestestR)
+
+if(!require(emmeans)) install.packages("emmeans")
+library(emmeans)
+
+if(!require(ROSE)) install.packages("ROSE")
+library(ROSE)
+
+if(!require(Rmisc)) install.packages("Rmisc")
+library(Rmisc)
+
+if(!require(metafolio)) install.packages("metafolio")
+library(metafolio)
+
+if(!require(tibble)) install.packages("tibble")
+library(tibble)
+
+if(!require(modelr)) install.packages("modelr")
+library(modelr)
+
+if(!require(tidybayes)) install.packages("tidybayes")
+library(tidybayes)
+
+if(!require(mgcv)) install.packages("mgcv")
+library(mgcv)
+
+if(!require(ciTools)) install.packages("ciTools")
+library(ciTools)
+
+if(!require(gratia)) install.packages("gratia")
+library(gratia)
+
+if(!require(scales)) install.packages("scales")
+library(scales)
+
+if(!require(patchwork)) install.packages("patchwork")
+library(patchwork)
+
+if(!require(ggforce)) install.packages("ggforce")
+library(ggforce)
 ```
 
-## Including Plots
+# Load vehicle data
 
-You can also embed plots, for example:
+This provides timing responses to takeovers and collision data. We also remove participants that were removed in the gaze entropy analysis. 
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r}
+# response data frame for vehicle and eye data per trial
+response.vehicle.eye <- fread(file = here::here("takeover_performance_cogload_time_budget/Data/takeover.responses.critical.lat.long.csv"))
+
+# removing participants from vehicle and gaze data
+response.vehicle.eye <- response.vehicle.eye %>%
+  dplyr::filter(ppid != 34, ppid != 39, ppid != 47) %>%
+  tidyr::drop_na()
+
+# make collision data 1s and 0s
+response.vehicle.eye <- response.vehicle.eye %>%
+  dplyr::mutate(collision = case_when(collision == TRUE ~ 1,
+                                      collision == FALSE ~ 0))
+
+# computing outliers for braking reaction time
+response.vehicle.eye <-  response.vehicle.eye %>%
+  #dplyr::filter(collision == 0) %>%
+  tidyr::drop_na() %>%
+  dplyr::group_by(n_back, ttc_criticality.x) %>%
+  dplyr::mutate(mean.rt = mean(rt), sd.rt = sd(rt)) %>%
+  dplyr::mutate(sd.rt.4 =  sd.rt * 4) %>%
+  dplyr::mutate(mean_4_sd = mean.rt + sd.rt.4) %>%
+  dplyr::mutate(rt.outlier = rt > mean_4_sd)
+
+# calculating outliers for hands on reaction time
+response.vehicle.eye <-  response.vehicle.eye %>%
+  #dplyr::filter(collision == 0) %>%
+  tidyr::drop_na() %>%
+  dplyr::group_by(n_back, ttc_criticality.x) %>%
+  dplyr::mutate(mean.ho = mean(ho.rt), sd.ho = sd(ho.rt)) %>%
+  dplyr::mutate(sd.ho.4 =  sd.ho * 4) %>%
+  dplyr::mutate(mean_4_sd = mean.ho + sd.ho.4) %>%
+  dplyr::mutate(ho.outlier = ho.rt > mean_4_sd)
+
+# removing outliers
+response.vehicle.eye <- response.vehicle.eye %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+## Braking reaction time
+
+```{r}
+# loading model
+braking_rt_shifted_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/braking_rt_shifted_lognormal_maximal.rds"))
+
+# posterior predictive checks
+brt_stat_grouped_ttc <- pp_check(braking_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+brt_stat_grouped_nback <- pp_check(braking_rt_shifted_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+# predicted global mean RTs implied by the model # setting re_formula = NA tells the function to not use any random effects - here we plot the TTC specific distributions 
+predicted_braking_rt_ttc <- braking_rt_shifted_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
+                                    n_back = FALSE),
+              re_formula = NA)
+
+predicted_braking_rt_ttc %>% mean_hdi()
+
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR MEAN BRT
+
+# mean BRT for critcality
+sm_fig_1_1 <- ggplot(brt_stat_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(mean_brt = mean(rt)), mapping = aes(xintercept = mean_brt, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(1.0, 1.5), breaks = seq(1.0, 1.4, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(RT[B]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.593, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean BRT for N-back
+sm_fig_1_2 <- ggplot(brt_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(mean_brt = mean(rt)), mapping = aes(xintercept = mean_brt, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(1.0, 1.5), breaks = seq(1.0, 1.4, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(RT[B]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig1 <- sm_fig_1_1 / sm_fig_1_2
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig1.tiff"), plot = sm_fig1, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+
+pp_check(braking_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(braking_rt_shifted_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_brt <- response.vehicle.eye %>% 
+  select(rt, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(braking_rt_shifted_lognormal_maximal, ndraws = 100)
+
+sm_fig2_1 <- ggplot() + 
+  geom_density(yrep_brt, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(rt, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(RT[B]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+
+sm_fig2_2 <- ggplot() + 
+  geom_density(yrep_brt, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(rt, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(RT[B]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig2 <- sm_fig2_1 / sm_fig2_2
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig2.tiff"), plot = sm_fig2, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+
+### SIMULATED NEW PARTICIPANTS
+
+# - change NA to observed data - then use legend to identify y versus y_rep
+brt_hist <- pp_check(braking_rt_shifted_lognormal_maximal, type = "hist", ndraws = 11)
+
+ggplot(brt_hist[["data"]], mapping = aes(value)) +
+  geom_histogram() +
+  facet_wrap(~ rep_id)
+```
