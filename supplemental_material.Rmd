@@ -194,7 +194,7 @@ sm_fig_1_1 <- ggplot(brt_stat_grouped_ttc[["data"]] %>%
   ylab(" ") +
   xlab(expression(RT[B]~ "(s)")) +
   theme_bw() +
-  theme(legend.position = c(.593, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.585, .70), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 n_back_labs <- c("No N-back", "N-back")
 names(n_back_labs) <- c(FALSE, TRUE)
@@ -216,7 +216,7 @@ sm_fig_1_2 <- ggplot(brt_stat_grouped_nback[["data"]] %>%
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-sm_fig1 <- sm_fig_1_1 / sm_fig_1_2
+sm_fig1 <- sm_fig_1_1 / sm_fig_1_2 + plot_layout(axes = "collect")
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig1.tiff"), plot = sm_fig1, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
@@ -241,7 +241,7 @@ sm_fig2_1 <- ggplot() +
   ylab(" ") +
   xlab(expression(RT[B]~ "(s)")) +
   theme_bw() +
-  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.94, .71), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 
 sm_fig2_2 <- ggplot() + 
@@ -257,7 +257,7 @@ sm_fig2_2 <- ggplot() +
   theme_bw() +
   theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-sm_fig2 <- sm_fig2_1 / sm_fig2_2
+sm_fig2 <- sm_fig2_1 / sm_fig2_2 + plot_layout(axes = "collect")
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig2.tiff"), plot = sm_fig2, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
@@ -268,7 +268,786 @@ ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental materia
 # - change NA to observed data - then use legend to identify y versus y_rep
 brt_hist <- pp_check(braking_rt_shifted_lognormal_maximal, type = "hist", ndraws = 11)
 
-ggplot(brt_hist[["data"]], mapping = aes(value)) +
-  geom_histogram() +
-  facet_wrap(~ rep_id)
+brt_hist_df <- brt_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig3 <- ggplot(brt_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(RT[B]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig3.tiff"), plot = sm_fig3, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## Hands on reatcion time
+
+```{r}
+# loading model
+hands_on_rt_model <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/handson_rt_shifted_lognormal_maximal.rds"))
+
+# posterior predictive checks
+hort_stat_grouped_ttc <- pp_check(hands_on_rt_model, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+hort_stat_grouped_nback <- pp_check(hands_on_rt_model, type = "stat_grouped", stat = "mean", group = "n_back")
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR MEAN BRT
+
+# mean HORT for critcality
+sm_fig_4_1 <- ggplot(hort_stat_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(mean_hort = mean(ho.rt)), mapping = aes(xintercept = mean_hort, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(1.1, 1.8), breaks = seq(1.1, 1.8, .2), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(RT[HO]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.593, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean BRT for N-back
+sm_fig_4_2 <- ggplot(hort_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(mean_hort = mean(ho.rt)), mapping = aes(xintercept = mean_hort, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(1.1, 1.8), breaks = seq(1.1, 1.8, .2), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(RT[HO]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig4 <- sm_fig_4_1 / sm_fig_4_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig4.tiff"), plot = sm_fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+
+pp_check(hands_on_rt_model, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(hands_on_rt_model, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_hort <- response.vehicle.eye %>% 
+  select(ho.rt, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(hands_on_rt_model, ndraws = 100)
+
+sm_fig5_1 <- ggplot() + 
+  geom_density(yrep_hort, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(rt, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  xlim(0, 8) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(RT[HO]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+
+sm_fig5_2 <- ggplot() + 
+  geom_density(yrep_hort, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(rt, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  xlim(0, 8) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(RT[HO]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig5 <- sm_fig5_1 / sm_fig5_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig5.tiff"), plot = sm_fig5, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+
+### SIMULATED NEW PARTICIPANTS
+
+# - change NA to observed data - then use legend to identify y versus y_rep
+hort_hist <- pp_check(hands_on_rt_model, type = "hist", ndraws = 11)
+
+hort_hist_df <- hort_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig6 <- ggplot(hort_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  xlim(0, 8) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(RT[HO]~ "(s)")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig6.tiff"), plot = sm_fig6, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## Mean deceleration
+
+```{r}
+# loading model
+mean_decel_model <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal.rds"))
+
+# posterior predictive checks
+decel_stat_grouped_ttc <- pp_check(mean_decel_model, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+decel_stat_grouped_nback <- pp_check(mean_decel_model, type = "stat_grouped", stat = "mean", group = "n_back")
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR MEAN BRT
+
+# mean decel for critcality
+sm_fig_7_1 <- ggplot(decel_stat_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(mean_decel = mean(mean_decel)), mapping = aes(xintercept = mean_decel, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(-4, -1), breaks = seq(-1, -4, -1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.593, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean BRT for N-back
+sm_fig_7_2 <- ggplot(decel_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(mean_decel = mean(mean_decel)), mapping = aes(xintercept = mean_decel, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(-3, -1.75), breaks = seq(-3, -2, .25), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig7 <- sm_fig_7_1 / sm_fig_7_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig7.tiff"), plot = sm_fig7, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+
+pp_check(mean_decel_model, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(mean_decel_model, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_decel <- response.vehicle.eye %>% 
+  select(mean_decel, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(mean_decel_model, ndraws = 100)
+
+sm_fig8_1 <- ggplot() + 
+  geom_density(yrep_decel, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(mean_decel, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  #xlim(-9, 2) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig8_2 <- ggplot() + 
+  geom_density(yrep_decel, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(mean_decel, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  #xlim(-9, 2) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig8 <- sm_fig8_1 / sm_fig8_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig8.tiff"), plot = sm_fig8, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+
+### SIMULATED NEW PARTICIPANTS
+
+# - change NA to observed data - then use legend to identify y versus y_rep
+decel_hist <- pp_check(mean_decel_model, type = "hist", ndraws = 11)
+
+decel_hist_df <- decel_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig9 <- ggplot(decel_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  #xlim(-8.5, 1) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(M[D] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.815, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig9.tiff"), plot = sm_fig9, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## Mean lateral accelerations
+
+```{r}
+# loading model
+lat_model <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_lat_acc_lognormal_maximal.rds"))
+
+# posterior predictive checks
+lat_stat_grouped_ttc <- pp_check(lat_model, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+lat_stat_grouped_nback <- pp_check(lat_model, type = "stat_grouped", stat = "mean", group = "n_back")
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR MEAN lat
+
+# mean lateral for criticality
+sm_fig_10_1 <- ggplot(lat_stat_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(lat = mean(mean_lat_acc)), mapping = aes(xintercept = lat, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(.1, .4), breaks = seq(.1, .4, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.593, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean lateral for N-back
+sm_fig_10_2 <- ggplot(lat_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(lat = mean(mean_lat_acc)), mapping = aes(xintercept = lat, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(.1, .4), breaks = seq(.1, .4, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig10 <- sm_fig_10_1 / sm_fig_10_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig10.tiff"), plot = sm_fig10, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+
+pp_check(lat_model, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(lat_model, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_lat <- response.vehicle.eye %>% 
+  select(mean_lat_acc, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(lat_model, ndraws = 100)
+
+sm_fig11_1 <- ggplot() + 
+  geom_density(yrep_lat, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(mean_lat_acc, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  xlim(0, 3) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig11_2 <- ggplot() + 
+  geom_density(yrep_lat, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(mean_lat_acc, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  xlim(0, 3) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig11 <- sm_fig11_1 / sm_fig11_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig11.tiff"), plot = sm_fig11, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### SIMULATED NEW PARTICIPANTS
+
+# - change NA to observed data - then use legend to identify y versus y_rep
+lat_hist <- pp_check(lat_model, type = "hist", ndraws = 11)
+
+lat_hist_df <- lat_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig12 <- ggplot(lat_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  scale_x_continuous(limits = c(0, 2), breaks = seq(0, 1.5, .5), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(M[LA] ~"("~m/s^2~")")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+  # plot saving
+  ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig12.tiff"), plot = sm_fig12, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## SDLP
+
+```{r}
+# loading model
+sdlp_model <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal.rds"))
+
+# posterior predictive checks
+sdlp_stat_grouped_ttc <- pp_check(sdlp_model, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+sdlp_stat_grouped_nback <- pp_check(sdlp_model, type = "stat_grouped", stat = "mean", group = "n_back")
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR MEAN SDLP
+
+# mean SDLP for criticality
+sm_fig_13_1 <- ggplot(sdlp_stat_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(sdlp = mean(sdlp)), mapping = aes(xintercept = sdlp, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(.2, .6), breaks = seq(.2, .6, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(SD[LP]~ "(m)")) +
+  theme_bw() +
+  theme(legend.position = c(.92, .70), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean SDLP for N-back
+sm_fig_13_2 <- ggplot(sdlp_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(sdlp = mean(sdlp)), mapping = aes(xintercept = sdlp, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(.2, .6), breaks = seq(.2, .6, .1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(SD[LP]~ "(m)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig13 <- sm_fig_13_1 / sm_fig_13_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig13.tiff"), plot = sm_fig13, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+
+pp_check(sdlp_model, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(sdlp_model, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_sdlp <- response.vehicle.eye %>% 
+  select(sdlp, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(sdlp_model, ndraws = 100)
+
+sm_fig14_1 <- ggplot() + 
+  geom_density(yrep_sdlp, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sdlp, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(SD[LP]~ "(m)")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .72), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig14_2 <- ggplot() + 
+  geom_density(yrep_sdlp, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sdlp, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(SD[LP]~ "(m)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig14 <- sm_fig14_1 / sm_fig14_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig14.tiff"), plot = sm_fig14, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### SIMULATED NEW PARTICIPANTS
+
+sdlp_hist <- pp_check(sdlp_model, type = "hist", ndraws = 11)
+
+sdlp_hist_df <- sdlp_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig15 <- ggplot(sdlp_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  xlim(0, 5) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[LP]~ "(m)")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig15.tiff"), plot = sm_fig15, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## SD of horizontal gaze - pre-takeover 
+
+```{r}
+sd_yaw_automation_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_lognormal_maximal.rds"))
+
+# posterior predictive checks
+yaw_pre_stat_grouped_nback <- pp_check(sd_yaw_automation_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean SSD of yaw for N-back
+sm_fig16 <- ggplot(yaw_pre_stat_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(sd_yaw_automation = mean(sd_yaw_automation)), mapping = aes(xintercept = sd_yaw_automation, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(3, 12), breaks = seq(4, 12, 2), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig16.tiff"), plot = sm_fig16, width = 16, height = 6, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+pp_check(sd_yaw_automation_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+
+yrep_yaw_pre <- response.vehicle.eye %>% 
+  select(sd_yaw_automation, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(sd_yaw_automation_lognormal_maximal, ndraws = 100)
+
+sm_fig17 <- ggplot() + 
+  geom_density(yrep_yaw_pre, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sd_yaw_automation, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig17.tiff"), plot = sm_fig17, width = 16, height = 6, units = 'cm', dpi = 300, type = 'cairo')
+
+### SIMULATED NEW PARTICIPANTS
+yaw_pre_hist <- pp_check(sd_yaw_automation_lognormal_maximal, type = "hist", ndraws = 11)
+
+yaw_pre_hist_df <- yaw_pre_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig18 <- ggplot(yaw_pre_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  xlim(-5, 40) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .905), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig18.tiff"), plot = sm_fig18, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## SD of horizontal gaze - post-takeover (Gaussian)
+
+```{r}
+# loading model
+yaw_post_model <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal.rds"))
+
+# posterior predictive checks
+yaw_post_grouped_ttc <- pp_check(yaw_post_model, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+yaw_post_grouped_nback <- pp_check(yaw_post_model, type = "stat_grouped", stat = "mean", group = "n_back")
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+### STAT GROUPED PLOTS FOR sd of yaw
+sm_fig_19_1 <- ggplot(yaw_post_grouped_ttc[["data"]] %>%
+         dplyr::mutate(ttc_criticality_factor = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(ttc_criticality_factor) %>%
+               dplyr::summarise(sd_yaw = mean(sd_yaw_manual)), mapping = aes(xintercept = sd_yaw, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(8, 12), breaks = seq(8, 12, 1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.92, .70), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+# mean lateral for N-back
+sm_fig_19_2 <- ggplot(yaw_post_grouped_nback[["data"]] %>%
+         dplyr::mutate(n_back = as.factor(group)), mapping = aes(value)) +
+  geom_histogram(aes(fill = "T(y_rep)"),col = "black") + 
+  geom_vline(response.vehicle.eye %>% 
+               dplyr::group_by(n_back) %>%
+               dplyr::summarise(sd_yaw = mean(sd_yaw_manual)), mapping = aes(xintercept = sd_yaw, fill = "T(y)"), col = "darkblue", size = 2) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  scale_fill_manual(name = "T = mean", values = c("darkblue", "lightblue"), labels = c(expression(T(y)), expression(T(y[rep])))) +
+  scale_x_continuous(limits = c(8, 12), breaks = seq(8, 12, 1), labels = label_number(accuracy = 0.1)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig19 <- sm_fig_19_1 / sm_fig_19_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig19.tiff"), plot = sm_fig19, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### DENSITY POSTERIOR PLOTS 
+pp_check(yaw_post_model, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(yaw_post_model, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_yaw_post <- response.vehicle.eye %>% 
+  select(sd_yaw_manual, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(yaw_post_model, ndraws = 100)
+
+sm_fig20_1 <- ggplot() + 
+  geom_density(yrep_yaw_post, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sd_yaw_manual, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  #xlim(-5, 25) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig20_2 <- ggplot() + 
+  geom_density(yrep_yaw_post, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sd_yaw_manual, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  #xlim(-5, 25) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig20 <- sm_fig20_1 / sm_fig20_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig20.tiff"), plot = sm_fig20, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### SIMULATED NEW PARTICIPANTS
+lat_hist <- pp_check(yaw_post_model, type = "hist", ndraws = 11)
+
+lat_hist_df <- lat_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig21 <- ggplot(lat_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  #xlim(-5, 30) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.611, .955), legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig21.tiff"), plot = sm_fig21, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+
+## SD of horizontal gaze - post-takeover (Truncated Gaussian)
+
+```{r}
+# loading model
+yaw_post_model_trunc <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal.rds"))
+
+ttc_labs <- c("TTC = 3 s", "TTC = 5 s")
+names(ttc_labs) <- c(as.factor(3), as.factor(5))
+
+n_back_labs <- c("No N-back", "N-back")
+names(n_back_labs) <- c(FALSE, TRUE)
+
+### DENSITY POSTERIOR PLOTS 
+pp_check(yaw_post_model_trunc, type = "dens_overlay_grouped", group = "n_back", ndraws = 100) 
+pp_check(yaw_post_model_trunc, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100) 
+
+yrep_yaw_post <- response.vehicle.eye %>% 
+  select(sd_yaw_manual, n_back, ttc_criticality_factor, ppid) %>% 
+  add_predicted_draws(yaw_post_model_trunc, ndraws = 100)
+
+sm_fig22_1 <- ggplot() + 
+  geom_density(yrep_yaw_post, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sd_yaw_manual, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  #xlim(-5, 25) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("A") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.94, .69), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig22_2 <- ggplot() + 
+  geom_density(yrep_yaw_post, mapping = aes(.prediction, group = .draw, col = "y_rep"), alpha = .8) +
+  geom_density(response.vehicle.eye, mapping = aes(sd_yaw_manual, col = "y"), size = 1) +
+  scale_colour_manual(name = " ", values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = n_back_labs)) +
+  #xlim(-5, 25) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ggtitle("B") +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = "none", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+sm_fig22 <- sm_fig22_1 / sm_fig22_2 + plot_layout(axes = "collect")
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig22.tiff"), plot = sm_fig22, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+### SIMULATED NEW PARTICIPANTS
+lat_hist <- pp_check(yaw_post_model_trunc, type = "hist", ndraws = 11)
+
+lat_hist_df <- lat_hist[["data"]] %>%
+  mutate(across(everything(), ~ replace_na(., 12)))
+
+sim_labs <- c(seq(1, 11, 1), "Observed data")
+names(sim_labs) <- c(seq(1, 11, 1), 12)
+
+sm_fig23 <- ggplot(lat_hist_df, mapping = aes(value, fill = is_y_label)) +
+  geom_histogram(col = "black") +
+  scale_fill_manual(name = NULL, values = c("darkblue", "lightblue"), labels = c(expression(y), expression(y[rep]))) +
+  facet_wrap(~ rep_id, labeller = labeller(rep_id = sim_labs)) +
+  #xlim(-5, 30) +
+  scale_y_continuous(expand = c(0, 0)) +
+  ylab(" ") +
+  xlab(expression(SD[YAW]~ "(°)")) +
+  theme_bw() +
+  theme(legend.position = c(.945, .565), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.text.y = element_blank(), axis.ticks.y = element_blank(),axis.ticks = element_blank(), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Supplemental material/Figures/sm_fig23.tiff"), plot = sm_fig23, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```

@@ -522,21 +522,22 @@ mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal"))
 
 
+mean_decel_trunc_gaussian_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_trunc_skewnormal_reg_priors_maximal.rds"))
 
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+# modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is skew-normal. 
+mean_decel_trunc_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
+                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
+                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                                             dplyr::mutate(ppid = as.factor(ppid)),
+                                           family = gaussian(),
+                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                                     prior(student_t(3, 0, 2.5), class = "b")),
+                                           bf(mean_decel | trunc(ub = 0) ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
+                                           control = list(adapt_delta = 0.99999999999),
+                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
+                                           file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_trunc_gaussian_reg_priors_maximal"))
 
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-d <- pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
-
-ggplot(d[["data"]], mapping = aes(value)) +
-  geom_histogram(aes(fill = as.factor(is_y))) +
-  facet_wrap(~ rep_id)
-
-
+mean_decel_gaussian_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal.rds"))
 
 # modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is Gaussian.
 mean_decel_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
@@ -550,19 +551,6 @@ mean_decel_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            control = list(adapt_delta = 0.99999999999),
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal"))
-# summarising model parameters 
-print(summary(mean_decel_gaussian_reg_priors_maximal), digits = 5)
-describe_posterior(mean_decel_gaussian_reg_priors_maximal, centrality = "mean")
-
-
-pp_check(mean_decel_gaussian_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(mean_decel_gaussian_reg_priors_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(mean_decel_gaussian_reg_priors_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(mean_decel_gaussian_reg_priors_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_criticality_factor")
 ```
 
 # Mean decelerations: model predictions
@@ -570,7 +558,7 @@ pp_check(mean_decel_skewnormal_reg_priors_maximal, type = "hist", group = "ttc_c
 ```{r}
 # summarising model parameters 
 print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
-describe_posterior(mean_decel_skewnormal_reg_priors_maximal , centrality = "mean")
+describe_posterior(mean_decel_skewnormal_reg_priors_maximal, centrality = "mean")
 
 #### Global mean effect of TTC #### # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
 predicted_mean_decel_ttc <- mean_decel_skewnormal_reg_priors_maximal %>% 
@@ -933,10 +921,17 @@ sd_yaw_automation_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                                    file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_gaussian_maximal"))
 
+sd_yaw_automation_lognormal_maximal <- brm(data = response.vehicle.eye %>%
+                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                             dplyr::mutate(ppid = as.factor(ppid)),
+                           family = lognormal(),
+                           sd_yaw_automation ~ n_back + (n_back | ppid),
+                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                     prior(student_t(3, 0, 2.5), class = "b")),
+                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
+                                                   file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_lognormal_maximal"))
 
-# posterior predictive checks
-pp_check(sd_yaw_automation_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-pp_check(sd_yaw_automation_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
 ```
 
 # SD of horitzonal gaze during automation: model predictions
@@ -956,6 +951,31 @@ predicted_sd_yaw_automation_nback %>% mean_hdi()
 
 # average marginal effect of n-back
 sd_yaw_automation_MER_nback <- sd_yaw_automation_gaussian_maximal %>% 
+  emmeans(~ n_back,
+          epred = TRUE, re_formula = NA) %>% 
+  contrast(method = "revpairwise") %>% 
+  gather_emmeans_draws()
+
+sd_yaw_automation_MER_nback  %>% mean_hdi()
+
+
+
+## Log normal model summary
+
+# model summary
+print(summary(sd_yaw_automation_lognormal_maximal), digits = 5)
+describe_posterior(sd_yaw_automation_lognormal_maximal, centrality = "mean")
+
+# average predicted SD of yaw during automation with and without n-back
+predicted_sd_yaw_automation_nback <- sd_yaw_automation_lognormal_maximal %>% 
+  epred_draws(newdata = expand_grid(n_back = c(TRUE, FALSE)),
+              re_formula = NA)
+
+predicted_sd_yaw_automation_nback %>% mean_hdi()
+
+
+# average marginal effect of n-back
+sd_yaw_automation_MER_nback <- sd_yaw_automation_lognormal_maximal %>% 
   emmeans(~ n_back,
           epred = TRUE, re_formula = NA) %>% 
   contrast(method = "revpairwise") %>% 
@@ -1185,19 +1205,45 @@ sd_yaw_manual_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            control = list(adapt_delta = 0.95),
                            file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal"))
 
+
+sd_yaw_manual_trunc_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal.rds"))
+
+# initial model of sd_yaw
+sd_yaw_manual_trunc_gaussian_maximal <- brm(data = response.vehicle.eye %>%
+                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                             dplyr::mutate(ppid = as.factor(ppid)),
+                           family = gaussian(),
+                           bf(sd_yaw_manual | trunc(lb = 0) ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor| ppid)),
+                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                     prior(student_t(3, 0, 2.5), class = "b")),
+                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
+                           control = list(adapt_delta = 0.95),
+                           file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal"))
+
+
 # posterior predictive checks
 pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
 pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
 
 pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
 pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
+
+
+
+# posterior predictive checks
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
+pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
+
+pp_check(sd_yaw_manual_trunc_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
+pp_check(sd_yaw_manual_trunc_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 ```
 
 ## SD of horizontal gaze during manual driving: model predictions
 
 ```{r}
-print(summary(sd_yaw_manual_gaussian_maximal), digits = 5)
-describe_posterior(sd_yaw_manual_gaussian_maximal, centrality = "mean")
+print(summary(sd_yaw_manual_trunc_gaussian_maximal), digits = 5)
+describe_posterior(sd_yaw_manual_trunc_gaussian_maximal, centrality = "mean")
 
 #### predicted posterior means and distribution ####
 predicted_draws = empty_grid %>%
@@ -1207,7 +1253,7 @@ expected_values = empty_grid %>%
   add_epred_draws(sd_yaw_manual_gaussian_maximal)
 
 # predicted mean SD yaw  implied by the model as a function of TTC # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
-predicted_sd_yaw_manual_ttc <- sd_yaw_manual_gaussian_maximal %>% 
+predicted_sd_yaw_manual_ttc <- sd_yaw_manual_trunc_gaussian_maximal %>% 
   epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3), as.factor(5)),
                                     n_back = FALSE),
               re_formula = NA)
@@ -1215,7 +1261,7 @@ predicted_sd_yaw_manual_ttc <- sd_yaw_manual_gaussian_maximal %>%
 predicted_sd_yaw_manual_ttc %>% mean_hdi()
 
 # margainal effect of TTC for SD of yaw
-sd_yaw_manual_MER_TTC <- sd_yaw_manual_gaussian_maximal %>% 
+sd_yaw_manual_MER_TTC <- sd_yaw_manual_trunc_gaussian_maximal %>% 
   emmeans(~ ttc_criticality_factor,
           at = list(n_back = FALSE),
           epred = TRUE, re_formula = NA) %>% 
@@ -1226,7 +1272,7 @@ sd_yaw_manual_MER_TTC %>% mean_hdi()
 
 
 ## predicted means for the effect of n-back on SD yaw
-predicted_sd_yaw_manual_nback <- sd_yaw_manual_gaussian_maximal %>% 
+predicted_sd_yaw_manual_nback <- sd_yaw_manual_trunc_gaussian_maximal %>% 
   epred_draws(newdata = expand_grid(ttc_criticality_factor = c(as.factor(3)),
                                     n_back = c(FALSE, TRUE)),
               re_formula = NA)
@@ -1234,7 +1280,7 @@ predicted_sd_yaw_manual_nback <- sd_yaw_manual_gaussian_maximal %>%
 predicted_sd_yaw_manual_nback  %>% mean_hdi()
 
 # marginal effect of N-back of SD of yaw during manual driving
-sd_yaw_manual_MER_nback <- sd_yaw_manual_gaussian_maximal %>% 
+sd_yaw_manual_MER_nback <- sd_yaw_manual_trunc_gaussian_maximal %>% 
   emmeans(~ n_back,
           at = list(ttc_criticality_factor = as.factor(3)),
           epred = TRUE, re_formula = NA) %>% 
