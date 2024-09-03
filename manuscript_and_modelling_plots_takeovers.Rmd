@@ -490,7 +490,7 @@ ggplot(response.vehicle.eye %>%
   facet_grid(~ttc_criticality_factor)
 
 # regularising priors for parameter values
-prior(student_t(5, 9, 2.5)) %>% 
+prior(normal(0, 5)) %>% 
   parse_dist() %>% 
   ggplot(aes(xdist = .dist_obj, y = prior)) + 
   stat_halfeye(.width = c(.5, .99)) +
@@ -551,6 +551,9 @@ mean_decel_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            control = list(adapt_delta = 0.99999999999),
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal"))
+
+print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
+describe_posterior(mean_decel_skewnormal_reg_priors_maximal, centrality = "mean")
 ```
 
 # Mean decelerations: model predictions
@@ -666,13 +669,6 @@ mean_lat_acc_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                       control = list(adapt_delta = 0.99999999999),
                                       iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                       file = here::here("takeover_performance_cogload_time_budget/Models/mean_lat_acc_lognormal_maximal"))
-
-
-pp_check(mean_lat_acc_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(mean_lat_acc_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(mean_lat_acc_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 ```
 
 ## Mean lateral accelerations: model predictions
@@ -784,7 +780,7 @@ ggplot(response.vehicle.eye %>%
   geom_histogram(aes(fill = as.factor(n_back)), alpha = 0.5, bins = 50, col = "black") + 
   xlab("SDLP") +
   facet_wrap(~ ttc_criticality.x) 
-
+  
 sdlp_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal.rds"))
 
 # initial model of SDLP
@@ -799,14 +795,6 @@ sdlp_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                    control = list(adapt_delta = 0.95),
                                    iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                    file = here::here("takeover_performance_cogload_time_budget/Models/sdlp_lognormal_maximal"))
-
-pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(sdlp_lognormal_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(sdlp_lognormal_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-pp_check(sdlp_lognormal_maximal, type = "hist", group = "ttc_criticality_factor")
 ```
 
 # SDLP: model predictions
@@ -921,6 +909,9 @@ sd_yaw_automation_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                                    file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_gaussian_maximal"))
 
+
+sd_yaw_automation_lognormal_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_lognormal_maximal.rds"))
+
 sd_yaw_automation_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
@@ -931,35 +922,11 @@ sd_yaw_automation_lognormal_maximal <- brm(data = response.vehicle.eye %>%
                                      prior(student_t(3, 0, 2.5), class = "b")),
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                                                    file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_automation_lognormal_maximal"))
-
 ```
 
 # SD of horitzonal gaze during automation: model predictions
 
 ```{r}
-# model summmary
-print(summary(sd_yaw_automation_gaussian_maximal), digits = 5)
-describe_posterior(sd_yaw_automation_gaussian_maximal, centrality = "mean")
-
-
-# average predicted SD of yaw during automation with and without n-back
-predicted_sd_yaw_automation_nback <- sd_yaw_automation_gaussian_maximal %>% 
-  epred_draws(newdata = expand_grid(n_back = c(TRUE, FALSE)),
-              re_formula = NA)
-
-predicted_sd_yaw_automation_nback %>% mean_hdi()
-
-# average marginal effect of n-back
-sd_yaw_automation_MER_nback <- sd_yaw_automation_gaussian_maximal %>% 
-  emmeans(~ n_back,
-          epred = TRUE, re_formula = NA) %>% 
-  contrast(method = "revpairwise") %>% 
-  gather_emmeans_draws()
-
-sd_yaw_automation_MER_nback  %>% mean_hdi()
-
-
-
 ## Log normal model summary
 
 # model summary
@@ -1205,10 +1172,9 @@ sd_yaw_manual_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            control = list(adapt_delta = 0.95),
                            file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_gaussian_maximal"))
 
-
+# truncated Gaussian model
 sd_yaw_manual_trunc_gaussian_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal.rds"))
 
-# initial model of sd_yaw
 sd_yaw_manual_trunc_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                              dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
                              dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
@@ -1220,23 +1186,6 @@ sd_yaw_manual_trunc_gaussian_maximal <- brm(data = response.vehicle.eye %>%
                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
                            control = list(adapt_delta = 0.95),
                            file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal"))
-
-
-# posterior predictive checks
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(sd_yaw_manual_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
-
-
-
-# posterior predictive checks
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "ttc_criticality_factor")
-pp_check(sd_yaw_manual_gaussian_maximal, type = "stat_grouped", stat = "mean", group = "n_back")
-
-pp_check(sd_yaw_manual_trunc_gaussian_maximal, type = "dens_overlay_grouped", group = "n_back", ndraws = 100)
-pp_check(sd_yaw_manual_trunc_gaussian_maximal, type = "dens_overlay_grouped", group = "ttc_criticality_factor", ndraws = 100)
 ```
 
 ## SD of horizontal gaze during manual driving: model predictions
@@ -1247,10 +1196,10 @@ describe_posterior(sd_yaw_manual_trunc_gaussian_maximal, centrality = "mean")
 
 #### predicted posterior means and distribution ####
 predicted_draws = empty_grid %>%
-  add_predicted_draws(sd_yaw_manual_gaussian_maximal)
+  add_predicted_draws(sd_yaw_manual_trunc_gaussian_maximal)
 
 expected_values = empty_grid %>%
-  add_epred_draws(sd_yaw_manual_gaussian_maximal)
+  add_epred_draws(sd_yaw_manual_trunc_gaussian_maximal)
 
 # predicted mean SD yaw  implied by the model as a function of TTC # setting re_formula = NA tells the function to not use any random effects - here we plot the n-back specific distributions 
 predicted_sd_yaw_manual_ttc <- sd_yaw_manual_trunc_gaussian_maximal %>% 
@@ -1474,7 +1423,7 @@ ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig11.tiff")
 
 ```{r}
 # relative size of  heterogenity effect for 2-back on mu
-summary(sd_yaw_manual_gaussian_maximal)[["random"]][["ppid"]][2,1] / summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1]
+summary(sd_yaw_manual_trunc_gaussian_maximal)[["random"]][["ppid"]][2,1] / summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1]
 
 # removing outliers and collisions from a specific dataframe
 response.vehicle.eye.removed <- response.vehicle.eye %>%
@@ -1483,18 +1432,18 @@ response.vehicle.eye.removed <- response.vehicle.eye %>%
   dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x), ppid = as.factor(ppid))
 
 # individual effects for SD of yaw during manual driving
-ppid.effects <- as.data.frame(ranef(sd_yaw_manual_gaussian_maximal)) %>%
+ppid.effects <- as.data.frame(ranef(sd_yaw_manual_trunc_gaussian_maximal)) %>%
   dplyr::select(ppid.Estimate.n_backTRUE) %>%
-  dplyr::mutate(ranef = ppid.Estimate.n_backTRUE + summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1]) %>%
+  dplyr::mutate(ranef = ppid.Estimate.n_backTRUE + summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1]) %>%
   tibble::rownames_to_column("ppid")
 
 ppid.effects$x <- 0
 
 # CI interval for average effect
-bayes.credible.intervals <- as.data.frame(summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][3:4])
+bayes.credible.intervals <- as.data.frame(summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][3:4])
 
 # select random effects parameter 
-ran.effects <- summary(sd_yaw_manual_gaussian_maximal)[["random"]][["ppid"]][2,1]
+ran.effects <- summary(sd_yaw_manual_trunc_gaussian_maximal)[["random"]][["ppid"]][2,1]
 
 # strip plot of individual effects
 strip_plot <- ggplot() +
@@ -1507,9 +1456,9 @@ strip_plot <- ggplot() +
   xlim(-1, 1) +
   geom_hline(aes(yintercept = bayes.credible.intervals$`l-95% CI`[2], linetype ="95% CI"), size = 1.5,  color = viridis(5)[3]) +
   geom_hline(aes(yintercept = bayes.credible.intervals$`u-95% CI`[2], linetype="95% CI"), size = 1.5,  color = viridis(5)[3]) +
-  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1], linetype = "beta_1"), size = 1.5, color = "black") +
-  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
-  geom_hline(aes(yintercept = summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1], linetype = "beta_1"), size = 1.5, color = "black") +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
+  geom_hline(aes(yintercept = summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects, linetype = "95% HI"), size = 1.5, color = viridis(5)[2]) +
   scale_linetype_manual(name = " ", values = c(2, 1, 1), labels = c(expression(CI[95]), expression(HI[95]), expression(beta[N])), guide = guide_legend(override.aes = list(color = c(viridis(5)[3], viridis(5)[2], "black")))) +
   scale_fill_manual(name = "Parameter", values = c(viridis(5)[2])) +
    annotate( # increased gaze concentration
@@ -1537,18 +1486,18 @@ strip_plot <- ggplot() +
   theme(legend.position = c(.181, .60), panel.grid.major.y = element_blank(), panel.grid.minor.y = element_blank(),legend.key = element_blank(), legend.key.width = unit(0.2, 'cm'), axis.text.y = element_blank(), axis.ticks.y = element_blank(), legend.key.size = unit(.05, 'cm'), plot.title = element_text(size = 15, face = "bold"), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), title = element_text(size = 7), legend.title = element_text(size = 11), legend.text = element_text(size = 7)) 
 
 # heterogenity intervals for the effect of N-back on SD of yaw during manual driving
-summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects
-summary(sd_yaw_manual_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects
+summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1] + 1.96 * ran.effects
+summary(sd_yaw_manual_trunc_gaussian_maximal)[["fixed"]][2,1] - 1.96 * ran.effects
 
 
-# participant 3, beta_n = -0.065
+# participant 3, beta_n = -0.022
 p_3 <- ggplot(dat.eye.manual %>%
          dplyr::filter(ppid == 3), mapping = aes(x = yaw, y = pitch)) +
   geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
   facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
   scale_colour_viridis_c(option = "C") +
   ggtitle(label = "B",
-          subtitle = "Participant 3," ~ beta[N[3]] ~ "= -.065") +
+          subtitle = "Participant 3," ~ beta[N[3]] ~ "= -.022") +
   xlab("Yaw (°)") +
   ylab("Pitch (°)") +
   xlim(-50, 50) +
@@ -1565,14 +1514,14 @@ p_3 <- ggplot(dat.eye.manual %>%
         plot.title = element_text(size = 15, face = "bold"))
 
 
-# participant 14, beta_n = .036
+# participant 14, beta_n = 0.052
 p_14 <- ggplot(dat.eye.manual %>%
          dplyr::filter(ppid == 14), mapping = aes(x = yaw, y = pitch)) +
   geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
   facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
   scale_colour_viridis_c(option = "C") +
   ggtitle(label = " ",
-          subtitle = "Participant 14," ~ beta[N[14]] ~ "= .036") +
+          subtitle = "Participant 14," ~ beta[N[14]] ~ "= .052") +
   xlab("Yaw (°)") +
   ylab("Pitch (°)") +
   xlim(-50, 50) +
@@ -1589,14 +1538,14 @@ p_14 <- ggplot(dat.eye.manual %>%
         plot.title = element_text(size = 15, face = "bold"))
 
 
-# participant 7, beta_n = -2.128
+# participant 7, beta_n = -2.424
 p_7 <- ggplot(dat.eye.manual %>%
          dplyr::filter(ppid == 7), mapping = aes(x = yaw, y = pitch)) +
   geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
   facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
   scale_colour_viridis_c(option = "C") +
   ggtitle(label = "C",
-          subtitle = "Participant 7," ~ beta[N[7]] ~ "= -2.128") +
+          subtitle = "Participant 7," ~ beta[N[7]] ~ "= -2.424") +
   xlab("Yaw (°)") +
   ylab("Pitch (°)") +
   xlim(-50, 50) +
@@ -1613,14 +1562,14 @@ p_7 <- ggplot(dat.eye.manual %>%
         plot.title = element_text(size = 15, face = "bold"))
 
 
-# participant 13, beta_n = -2.391
+# participant 13, beta_n = -2.317
 p_13 <- ggplot(dat.eye.manual %>%
          dplyr::filter(ppid == 13), mapping = aes(x = yaw, y = pitch)) +
   geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
   facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
   scale_colour_viridis_c(option = "C") +
   ggtitle(label = " ",
-          subtitle = "Participant 13," ~ beta[N[13]] ~ "= -2.391") +
+          subtitle = "Participant 13," ~ beta[N[13]] ~ "= -2.317") +
   xlab("Yaw (°)") +
   ylab("Pitch (°)") +
   xlim(-50, 50) +

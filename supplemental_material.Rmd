@@ -109,6 +109,12 @@ library(patchwork)
 
 if(!require(ggforce)) install.packages("ggforce")
 library(ggforce)
+
+if(!require(afex)) install.packages("afex")
+library(afex)
+
+if(!require(BayesFactor)) install.packages("BayesFactor")
+library(BayesFactor)
 ```
 
 # Load vehicle data
@@ -154,6 +160,70 @@ response.vehicle.eye <- response.vehicle.eye %>%
   dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
   dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x))
 ```
+
+## Identifying order effects
+
+```{r}
+# braking reaction time
+rt_order <- anovaBF(rt ~ event.order.factor, data = response.vehicle.eye %>% 
+                      dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                      dplyr::group_by(ppid, event.order.factor) %>%
+                      dplyr::summarise(rt = mean(rt)))
+
+rt_order
+
+# hands on time
+hort_order <- anovaBF(ho.rt ~ event.order.factor, data = response.vehicle.eye %>%
+                        dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                        dplyr::group_by(ppid, event.order.factor) %>%
+                        dplyr::summarise(ho.rt = mean(ho.rt)))
+
+hort_order
+
+# mean decel
+decel_order <- anovaBF(mean_decel ~ event.order.factor, data = response.vehicle.eye %>%
+                         dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                         dplyr::group_by(ppid, event.order.factor) %>%
+                          dplyr::summarise(mean_decel = mean(mean_decel)))
+
+decel_order
+
+# mean lateral accelerations
+lat_order <- anovaBF(mean_lat_acc ~ event.order.factor, data = response.vehicle.eye %>%
+                       dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                       dplyr::group_by(ppid, event.order.factor) %>%
+                        dplyr::summarise(mean_lat_acc = mean(mean_lat_acc)))
+
+lat_order
+
+# sdlp
+sdlp_order <- anovaBF(sdlp ~ event.order.factor, data = response.vehicle.eye %>%
+                        dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                        dplyr::group_by(ppid, event.order.factor) %>%
+                        dplyr::summarise(sdlp = mean(sdlp))
+                        )
+
+sdlp_order
+
+# SD of yaw - automation
+yaw_automation <- anovaBF(sd_yaw_automation ~ event.order.factor, data = response.vehicle.eye %>%
+                        dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                        dplyr::group_by(ppid, event.order.factor) %>%
+                        dplyr::summarise(sd_yaw_automation = mean(sd_yaw_automation))
+                        )
+
+yaw_automation
+
+# SD of yaw - manual
+yaw_manual <- anovaBF(sd_yaw_manual ~ event.order.factor, data = response.vehicle.eye %>%
+                        dplyr::mutate(event.order.factor = as.factor(event.order)) %>%
+                        dplyr::group_by(ppid, event.order.factor) %>%
+                        dplyr::summarise(sd_yaw_manual = mean(sd_yaw_manual))
+                        )
+
+yaw_manual
+```
+
 
 ## Braking reaction time
 
