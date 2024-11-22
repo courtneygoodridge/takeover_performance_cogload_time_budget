@@ -337,6 +337,9 @@ fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_T
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.png"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 # Hands-on time: model fitting
@@ -883,6 +886,9 @@ fig8 <- posterior_sdlp / (predicted_SDLP_ttc_plot | SDLP_MER_TTC_plot)
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig8.tiff"), plot = fig8, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig8.png"), plot = fig8, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
 # SD of horitzonal gaze during automation: model fitting
@@ -1589,5 +1595,7 @@ p_13 <- ggplot(dat.eye.manual %>%
 fig12 <- strip_plot / (p_3 | p_14) / (p_7 | p_13)
   
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.tiff"), plot = fig12, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
+
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.png"), plot = fig12, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
