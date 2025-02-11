@@ -1299,6 +1299,38 @@ fig10 <- posterior_sdyaw / (predicted_sd_yaw_manual_ttc_plot | sd_yaw_manual_MER
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig10.tiff"), plot = fig10, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
+# SD of horizontal gaze during maual driving - effect of N-back
+
+```{r}
+# predicted means
+predicted_sd_yaw_manual_nback_plot <- ggplot(predicted_sd_yaw_manual_nback, aes(x = .epred, y = " ", fill = n_back)) +
+  stat_halfeye(alpha = .5) +
+  ylab(NULL) +
+  xlab(expression("Predicted" ~ mu ~ "of" ~ SD[YAW]~ "(°)")) +
+  scale_fill_discrete(name = "Task", labels = c("Monitoring", "N-back + monitoring")) +
+  ggtitle(expression(SD[YAW]~": post-transition manual drive")) +
+  xlim(8, 17) +
+  theme_bw() +
+  theme(legend.position = c(.70, .70), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 10), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 10, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+# Average marginal effect for SD of yaw
+sd_yaw_manual_MER_nback_plot <- ggplot(sd_yaw_manual_MER_nback, aes(x = .value, y = " ")) +
+  stat_halfeye() +
+  ylab(NULL) +
+  xlab(expression(MER[SD[YAW]]~ "(°)")) +
+  #scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
+  theme_bw() +
+  theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+fig99 <- (predicted_sd_yaw_manual_nback_plot | sd_yaw_manual_MER_nback_plot)
+
+# plot saving
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig99.tiff"), plot = fig99, width = 18, height = 6, units = 'cm', dpi = 300, type = 'cairo')
+
+
+
+```
+
 # SD of horitzonal gaze during manual: dispersion plots
 
 ```{r}
