@@ -313,9 +313,10 @@ posterior_braking_rt <- response.vehicle.eye %>%
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
 
-predicted_braking_rt_ttc_plot <- ggplot(predicted_braking_rt_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_braking_rt_ttc_plot <- ggplot(predicted_braking_rt_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ RT[B]~ "(s)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
@@ -324,16 +325,17 @@ predicted_braking_rt_ttc_plot <- ggplot(predicted_braking_rt_ttc, aes(x = .epred
   theme(legend.position = c(.87, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 # Marginal Effects at Representative values (MER) of TTC on braking RT
-braking_rt_MER_TTC_plot <- ggplot(braking_rt_MER_TTC, aes(x = .value, y = " ")) +
+braking_rt_MER_TTC_plot <- ggplot(braking_rt_MER_TTC, aes(x = .value)) +
   stat_halfeye() +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression(MER[RT[B]]~ "(s) for TTC")) +
   ggtitle("C") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
   theme(legend.position = c(.9, .7), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
-fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_TTC_plot)
+fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_TTC_plot) + plot_layout(axes = "collect")
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
@@ -446,25 +448,27 @@ posterior_ho_rt <- response.vehicle.eye %>%
 
 
 # predicted hands-on time 
-predicted_ho_rt_ttc_plot <- ggplot(predicted_ho_rt_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_ho_rt_ttc_plot <- ggplot(predicted_ho_rt_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ RT[HO]~ "(s)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
-  theme(legend.position = c(.88, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.85, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 
 # MER of TTC on hands on RT
-ho_rt_MER_TTC_plot <- ggplot(ho_rt_MER_TTC, aes(x = .value, y = " ")) +
+ho_rt_MER_TTC_plot <- ggplot(ho_rt_MER_TTC, aes(x = .value)) +
   stat_halfeye() +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression(MER[RT[HO]]~ "(s) of TTC")) +
   ggtitle("C") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
-  theme(legend.position = c(.93, .62), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.90, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 fig5 <- posterior_ho_rt / (predicted_ho_rt_ttc_plot | ho_rt_MER_TTC_plot)
 
@@ -524,36 +528,6 @@ mean_decel_skewnormal_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
                                            iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
                                            file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_skewnormal_reg_priors_maximal"))
 
-
-mean_decel_trunc_gaussian_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_trunc_skewnormal_reg_priors_maximal.rds"))
-
-# modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is skew-normal. 
-mean_decel_trunc_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                             dplyr::mutate(ppid = as.factor(ppid)),
-                                           family = gaussian(),
-                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                     prior(student_t(3, 0, 2.5), class = "b")),
-                                           bf(mean_decel | trunc(ub = 0) ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
-                                           control = list(adapt_delta = 0.99999999999),
-                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                           file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_trunc_gaussian_reg_priors_maximal"))
-
-mean_decel_gaussian_reg_priors_maximal <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal.rds"))
-
-# modelling average deceleration with regularising priors. Random effects structure is maximal. Distribution family is Gaussian.
-mean_decel_gaussian_reg_priors_maximal <- brm(data = response.vehicle.eye %>%
-                                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, ho.rt > .15, collision == 0) %>%
-                                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
-                                             dplyr::mutate(ppid = as.factor(ppid)),
-                                           family = gaussian(),
-                                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
-                                                     prior(student_t(3, 0, 2.5), class = "b")),
-                                           bf(mean_decel ~ n_back * ttc_criticality_factor + (n_back * ttc_criticality_factor | ppid)),
-                                           control = list(adapt_delta = 0.99999999999),
-                                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13,
-                                           file = here::here("takeover_performance_cogload_time_budget/Models/mean_decel_gaussian_reg_priors_maximal"))
 
 print(summary(mean_decel_skewnormal_reg_priors_maximal), digits = 5)
 describe_posterior(mean_decel_skewnormal_reg_priors_maximal, centrality = "mean")
@@ -623,20 +597,22 @@ posterior_mean_decel <- response.vehicle.eye %>%
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
 # predicted mean decelerations
-predicted_mean_decel_ttc_plot <- ggplot(predicted_mean_decel_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_mean_decel_ttc_plot <- ggplot(predicted_mean_decel_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ M[D] ~ "("~m/s^2~")")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   xlim(-4, -.5) +
   theme_bw() +
-  theme(legend.position = c(.88, .57), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.85, .60), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 # MER of TTC on mean deceleration
-mean_decel_MER_TTC_plot <- ggplot(mean_decel_MER_TTC, aes(x = .value, y = " ")) +
+mean_decel_MER_TTC_plot <- ggplot(mean_decel_MER_TTC, aes(x = .value)) +
   stat_halfeye() +
-  ylab(NULL) +
+    ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression(MER[M[D]]~ "("~m/s^2~")" ~ "of TTC")) +
   ggtitle("C") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
@@ -745,9 +721,10 @@ l.labs <- c("No N-back", "N-back")
 names(l.labs) <- c("FALSE", "TRUE")
 
 # predicted mean lateral accelerations
-predicted_lat_acc_ttc_plot <- ggplot(predicted_lat_acc_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_lat_acc_ttc_plot <- ggplot(predicted_lat_acc_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ M[LA] ~ "("~m/s^2~")")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
@@ -863,19 +840,21 @@ posterior_sdlp <- response.vehicle.eye %>%
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
 # predicted means of SDLP
-predicted_SDLP_ttc_plot <- ggplot(predicted_SDLP_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_SDLP_ttc_plot <- ggplot(predicted_SDLP_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ SD[LP]~ "(m)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   theme_bw() +
-  theme(legend.position = c(.88, .6), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.85, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 # Average marginal effect of TTC on SDLP
-SDLP_MER_TTC_plot <- ggplot(SDLP_MER_TTC, aes(x = .value, y = " ")) +
+SDLP_MER_TTC_plot <- ggplot(SDLP_MER_TTC, aes(x = .value)) +
   stat_halfeye() +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression(MER[SD[LP]]~ "(m) of TTC")) +
   ggtitle("C") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
@@ -1273,20 +1252,22 @@ posterior_sdyaw <- response.vehicle.eye %>%
   theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
 # predicted means
-predicted_sd_yaw_manual_ttc_plot <- ggplot(predicted_sd_yaw_manual_ttc, aes(x = .epred, y = " ", fill = ttc_criticality_factor)) +
+predicted_sd_yaw_manual_ttc_plot <- ggplot(predicted_sd_yaw_manual_ttc, aes(x = .epred, fill = ttc_criticality_factor)) +
   stat_halfeye(alpha = .5) +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression("Predicted" ~ mu ~ "of" ~ SD[YAW]~ "(°)")) +
   ggtitle("B") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
   xlim(8, 14) +
   theme_bw() +
-  theme(legend.position = c(.88, .6), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+  theme(legend.position = c(.85, .65), axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 11), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10))
 
 # Average marginal effect for SD of yaw
-sd_yaw_manual_MER_TTC_plot <- ggplot(sd_yaw_manual_MER_TTC, aes(x = .value, y = " ")) +
+sd_yaw_manual_MER_TTC_plot <- ggplot(sd_yaw_manual_MER_TTC, aes(x = .value)) +
   stat_halfeye() +
-  ylab(NULL) +
+  ylim(-.1, 1) +
+  ylab("Density") +
   xlab(expression(MER[SD[YAW]]~ "(°)")) +
   ggtitle("C") +
   scale_fill_discrete(name = "TTC", labels = c("3 s", "5 s")) +
