@@ -1,0 +1,160 @@
+---
+title: "calculate_lateral_longitudinal_takeover_metrics"
+author: "Courtney Goodridge"
+date: "14/08/2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Preamble 
+
+This script takes in the eye tracking time series data and processes it for creating the contour plots for gaze dispersion in the Goodridge et al (2026) manuscript. 
+
+## Packages
+
+```{r}
+if(!require(here)) install.packages("here")
+library(here)
+
+if(!require(ggplot2)) install.packages("ggplot2")
+library(ggplot2)
+
+if(!require(dplyr)) install.packages("dplyr")
+library(dplyr)
+
+if(!require(tidyr)) install.packages("tidyr")
+library(tidyr)
+
+if(!require(readr)) install.packages("readr")
+library(readr)
+
+if(!require(data.table)) install.packages("data.table")
+library(data.table)
+```
+
+## Load current response data
+
+```{r}
+# response data frame for vehicle and eye data per trial
+response.vehicle.eye <- fread(file = here::here("ITS/Work package 6.5 (HiDrive)/TME study/Data/Processed data/data_for_analysis/takeover.responses.critical.csv"))
+```
+
+## Load manual driving post-takeover
+
+```{r}
+# loading critical trial timecourse data
+critical <- fread(file = here::here("ITS/Work package 6.5 (HiDrive)/TME study/Data/Processed data/data_for_analysis/dat.timecourse.critical.events.new.csv"))
+
+# focus on just manual driving portion
+# filtering manaual data and computing a common timestamp for every trial
+critical.manual <- critical %>%
+  dplyr::filter(vehicle_state == "manual") %>%
+  dplyr::group_by(trialid) %>%
+  dplyr::mutate(frame_manual = row_number()) %>%
+  dplyr::mutate(timestamp_common_manual = frame_manual / 60)
+  
+## filter first 30 s of manual steering for each trial
+critical.manual <- critical.manual %>%
+  dplyr::group_by(trialid) %>%
+  dplyr::filter(timestamp_common_manual <= 30)
+
+# average lateral accelerations data for plotting
+avg_lat_acc <- critical.manual %>%
+  dplyr::filter(ppid != 34, ppid != 39, ppid != 47) %>%
+  dplyr::arrange(trialid, timestamp_common_manual) %>%
+  dplyr::group_by(n_back, ttc_criticality, timestamp_common_manual) %>%
+  dplyr::summarise(lat_acc = mean(latacc))
+
+# data saving
+fwrite(avg_lat_acc, file = here::here("takeover_performance_cogload_time_budget/Data/avg_lat_acc.csv"))
+  
+# selecting trials in the timecourse that were used for modelling
+trials <- response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::select(trialid, rt)
+  
+critical.manual <- merge(critical.manual, trials, by = c("trialid"))
+
+# maximum longitudinal deceleration/lateral acceleration/longitudinal and lateral jerk
+lat_long_acc <- critical.manual %>%
+  dplyr::arrange(trialid, timestamp_common_manual) %>%
+  dplyr::group_by(trialid, n_back, ttc_criticality) %>%
+  dplyr::mutate(long_jerk = cumsum(c(0, diff(longacc))), lat_jerk = cumsum(c(0, diff(latacc)))) %>%
+  dplyr::summarise(max_long_jerk = min(long_jerk), max_lat_jerk = max(abs(lat_jerk)), max_long = min(longacc), mean_long = mean(longacc), max_lat = max(abs(latacc)), sd_latacc = sd(latacc), sd_steer = sd(stgAng), sdlp = sd(offset), mean_lat_acc = mean(abs(latacc))) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(trialid, max_long_jerk, max_lat_jerk, max_long, mean_long, max_lat, sd_latacc, sd_steer, sdlp, mean_lat_acc)
+
+# average deceleration
+mean_decel <- critical.manual %>%
+  dplyr::arrange(trialid, timestamp_common_manual) %>%
+  dplyr::group_by(trialid, n_back, ttc_criticality) %>%
+  dplyr::filter(longacc < 0) %>%
+  dplyr::summarise(mean_decel = mean(longacc)) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(trialid, mean_decel)
+
+# merge long and lat dyanmics variables
+lat_long_acc <- merge(lat_long_acc, mean_decel, by = c("trialid"))
+
+# merge main dataframe
+response.vehicle.eye <- merge(response.vehicle.eye, lat_long_acc, by = c("trialid"))
+```
+
+## Loading SD of horizontal/vertical gaze data for manual and automated driving period
+
+```{r}
+options(digits = 15)
+dat.eye <- fread(file = here::here("ITS/Work package 6.5 (HiDrive)/TME study/Data/Eye data/dat.eye.full.timecourse.csv"))
+
+# 30 s of pre-takeover eye data during automated driving
+dat.eye.automation <- dat.eye %>%
+  dplyr::group_by(trialid) %>%
+  dplyr::filter(vehicle_state == "automation") %>%
+    # calculate a common timestamp and use the first 30 s
+  dplyr::mutate(timestamp_common = cumsum(c(0, diff(X.simTime))), frame = row_number()) %>%
+  # find the last time stamp
+  dplyr::mutate(last_time = timestamp_common[n()]) %>%
+  # subtract 30 to get 30 s before the last time stamp of automation
+  dplyr::mutate(last_time_minus_30_s = last_time - 30) %>%
+  # filter data to get last 30 s of automation eye tracking data
+  dplyr::filter(timestamp_common >= last_time_minus_30_s) %>%
+  # convert to degrees and calculate gaze dispersion
+  dplyr::mutate(yaw = `dgaze/unified_gaze_direction/x` * 180 / pi, pitch = `dgaze/unified_gaze_direction/y` * 180 / pi)
+
+sd_pitch_yaw_automation <- dat.eye.automation %>%
+  dplyr::summarise(sd_yaw_automation = sd(yaw), sd_pitch_automation = sd(pitch)) %>%
+  # select data and trial indicator
+  dplyr::select(sd_yaw_automation, sd_pitch_automation, trialid)
+
+# merge with main dataframe
+response.vehicle.eye <- merge(response.vehicle.eye, sd_pitch_yaw_automation, by = c("trialid"))
+
+# 30 s of post-takeover eye data during manual driving
+dat.eye.manual <- dat.eye %>%
+  dplyr::group_by(trialid) %>%
+  # filter manaul eye data
+  dplyr::filter(vehicle_state == "manual") %>%
+  # calculate a common timestamp and use the first 30 s
+  dplyr::mutate(timestamp_common = cumsum(c(0, diff(X.simTime))), frame = row_number()) %>%
+  dplyr::filter(timestamp_common <= 30) %>%
+  dplyr::mutate(yaw = `dgaze/unified_gaze_direction/x` * 180 / pi, pitch = `dgaze/unified_gaze_direction/y` * 180 / pi)
+
+# sd of pitch and yaw
+sd_pitch_yaw_manual <- dat.eye.manual %>%
+  dplyr::group_by(trialid) %>%
+  dplyr::summarise(sd_yaw_manual = sd(yaw), sd_pitch_manual = sd(pitch)) %>%
+  dplyr::select(sd_yaw_manual, sd_pitch_manual, trialid)
+
+# merge gaze dispersion
+response.vehicle.eye <- merge(response.vehicle.eye, sd_pitch_yaw_manual, by = c("trialid"))
+```
+
+## Saving new response dataframe with lateral and longitudinal measures, and gaze measures
+
+```{r}
+## Data saving 
+fwrite(response.vehicle.eye, file = here::here("ITS/Work package 6.5 (HiDrive)/TME study/Data/Processed data/data_for_analysis/takeover.responses.critical.lat.long.csv"))
+```
