@@ -304,7 +304,8 @@ posterior_braking_rt <- response.vehicle.eye %>%
   scale_y_discrete(labels = c('No N-B','N-B'), guide = guide_axis(angle = 90)) +
   scale_color_brewer("Posterior predictive interval") +
   ggtitle("A") +
-  xlim(.5, 3.5) +
+  #xlim(.5, 3.5) +
+  xlim(.5, 2) +
   xlab(expression(RT[B]~ "(s)")) +
   ylab(" ") +
   #scale_x_continuous(breaks = seq(.5, 3, .5), labels = label_number(accuracy = .5)) +
@@ -339,9 +340,40 @@ fig4 <- posterior_braking_rt / (predicted_braking_rt_ttc_plot | braking_rt_MER_T
 
 # plot saving
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.tiff"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+## Hands-off RT for presentations
+
+
+```{r}
+hands_off_rt <- response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+  ggplot(aes(x = rt, y = n_back)) +
+  stat_pointinterval(aes(x = .epred), data = expected_values, .width = c(.50, .95), position = position_nudge(y = -0.35)) +
+  stat_interval(aes(x = .prediction), data = predicted_draws, .width = c(.50, .80, .95, .99)) +
+  geom_jitter(data = response.vehicle.eye %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0) %>%
+  dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)), size = 2, height = .08, alpha = .3) +
+  #geom_point(conditional_df_fitted[[3]], mapping = aes(x = estimate__, y = n_back), col = "white") +
+  scale_y_discrete(labels = c('Monitoring','N-back + Monitoring'), guide = guide_axis(angle = 90)) +
+  scale_color_brewer("Posterior predictive interval") +
+  #xlim(.5, 3.5) +
+  xlim(.5, 2) +
+  xlab(expression(RT[B]~ "(s)")) +
+  ylab(" ") +
+  #scale_x_continuous(breaks = seq(.5, 3, .5), labels = label_number(accuracy = .5)) +
+  #facet_wrap(~ ttc_criticality_factor, labeller = labeller(ttc_criticality_factor = ttc_labs)) +
+  theme_bw() +
+  theme(legend.position = "none", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 11), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 8, face = "bold"), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 15, face = "bold"), strip.text = element_text(face = "bold", size = 10)) 
 
 # plot saving
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/Fig4.png"), plot = fig4, width = 16, height = 12, units = 'cm', dpi = 300, type = 'cairo')
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/hands_off_rt.png"), plot = hands_off_rt, width = 10, height = 7, units = 'cm', dpi = 300, type = 'cairo')
+
+
+
 ```
 
 # Hands-on time: model fitting
@@ -1580,7 +1612,6 @@ p_7 <- ggplot(dat.eye.manual %>%
         plot.subtitle = element_text(size = 12, colour = turbo(5)[5]),
         plot.title = element_text(size = 15, face = "bold"))
 
-
 # participant 13, beta_n = -2.317
 p_13 <- ggplot(dat.eye.manual %>%
          dplyr::filter(ppid == 13), mapping = aes(x = yaw, y = pitch)) +
@@ -1608,7 +1639,125 @@ p_13 <- ggplot(dat.eye.manual %>%
 fig12 <- strip_plot / (p_3 | p_14) / (p_7 | p_13)
   
 ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.tiff"), plot = fig12, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
+```
 
-ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.png"), plot = fig12, width = 16, height = 18, units = 'cm', dpi = 300, type = 'cairo')
+## Example participant how has carryover effects - for presentations
+
+```{r}
+l.labs <- c("Monitoring", "N-back + Monitoring")
+names(l.labs) <- c("FALSE", "TRUE")
+
+p49 <- ggplot(dat.eye.manual %>%
+         dplyr::filter(ppid == 7), mapping = aes(x = yaw, y = pitch)) +
+  geom_density_2d(aes(col = ..level..), alpha = .5, binwidth = .00003) +
+  facet_wrap(~ n_back, labeller = labeller(n_back = l.labs)) +
+  scale_colour_viridis_c(option = "C") +
+  ggtitle("Gaze distribution during post-transition manual driving following:") +
+  xlab("Yaw (°)") +
+  ylab("Pitch (°)") +
+  xlim(-50, 50) +
+  scale_y_continuous(limits = c(-32, 20), breaks = seq(-30, 20, 15)) +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.x = element_text(size = 11), 
+        axis.text.x = element_text(size = 11), 
+        axis.title.y = element_text(size = 11), 
+        axis.text.y = element_text(size = 11), 
+        title = element_text(size = 18),
+        strip.text = element_text(face = "bold", size = 10),
+        plot.subtitle = element_text(size = 12, colour = turbo(5)[5]),
+        plot.title = element_text(size = 10))
+
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig12.png"), plot = p49, width = 12, height = 7.5, units = 'cm', dpi = 300, type = 'cairo')
+```
+
+# Does age impact effect of N-back
+
+```{r}
+sd_yaw_manual_trunc_gaussian_maximal_age <- brm(data = response.vehicle.eye %>%
+                             dplyr::filter(rt.outlier == FALSE, ho.outlier == FALSE, ho.rt != 0, collision == 0, ho.rt > .15) %>%
+                             dplyr::mutate(ttc_criticality_factor = as.factor(ttc_criticality.x)) %>%
+                             dplyr::mutate(ppid = as.factor(ppid)),
+                           family = gaussian(),
+                           bf(sd_yaw_manual | trunc(lb = 0) ~ n_back * ttc_criticality_factor * age.c + (n_back | ppid)),
+                           prior = c(prior(student_t(3, 0, 2.5), class = "Intercept"),
+                                     prior(student_t(3, 0, 2.5), class = "b")),
+                           iter = 5000, warmup = 2000, chains = 2, cores = 2, seed = 13, 
+                           control = list(adapt_delta = 0.95),
+                           file = here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal_age"))
+
+sd_yaw_manual_trunc_gaussian_maximal_age <- readRDS(here::here("takeover_performance_cogload_time_budget/Models/sd_yaw_manual_trunc_gaussian_maximal_age.rds"))
+
+print(summary(sd_yaw_manual_trunc_gaussian_maximal_age), digits = 5)
+describe_posterior(sd_yaw_manual_trunc_gaussian_maximal_age)
+
+
+#Get interaction coefficient
+nXa.coeff <- fixef(sd_yaw_manual_trunc_gaussian_maximal_age)[6]
+
+#Get residual variance of valence random effect in model with n_back
+residvalvar <- VarCorr(sd_yaw_manual_trunc_gaussian_maximal_age)$ppid$sd[2, 1]^2
+
+#Calculate the implied total valence random effect variance
+imptotalvalvar <- nXa.coeff^2*sd(response.vehicle.eye$age.c)^2 + residvalvar
+
+## Variance in mu difference explained by age
+1 - (residvalvar/imptotalvalvar)
+
+# computing random effects
+ageranef <- as.data.frame(ranef(sd_yaw_manual_trunc_gaussian_maximal_age)) %>%
+  dplyr::select(ppid.Estimate.Intercept, ppid.Estimate.n_backTRUE)
+
+colnames(ageranef) <- c("intercept_age", "slope_age")
+
+ageranef <- as.data.frame(ageranef) %>%
+  tibble::rownames_to_column("ppid.f") %>%
+  dplyr::mutate(ppid = as.numeric(ppid.f)) %>%
+  dplyr::select(!ppid.f)
+
+#Create dataset with one line per person with age score 
+ageranef <- merge(ageranef, response.vehicle.eye, by = 'ppid')
+ageranef <- ageranef %>%
+  dplyr::group_by(ppid) %>%
+  dplyr::slice(1) %>%
+  dplyr::select(ppid, age.c, intercept_age, slope_age)
+
+# Person-specific implied total n-back effects for model accounting for age
+ranef.age.pred.tot <- fixef(sd_yaw_manual_trunc_gaussian_maximal_age)[2] + # fixed effect for n-back
+  fixef(sd_yaw_manual_trunc_gaussian_maximal_age)[6] * # fixed effect for n-back X age interaction
+  ageranef$age.c + # age 
+  as.data.frame(ranef(sd_yaw_manual_trunc_gaussian_maximal_age))$ppid.Estimate.n_backTRUE # random effect slopes
+
+fig13 <- ggplot(ageranef, aes(age.c, ranef.age.pred.tot)) + 
+  geom_vline(xintercept = 0, size = .5, color = "black", linetype="solid") +
+  geom_hline(yintercept = mean(ranef.age.pred.tot), size = .5, color = "black", linetype="solid") +
+  stat_smooth(method = 'lm', ci = T, color = viridis(5)[3], size = 1) + 
+  geom_jitter(height = 0, width = 0, size = 4,
+              shape = 21, colour = "black", fill = viridis(5)[3], alpha = .95, stroke = 1) + 
+  xlab("Age (mean centered)") +
+  ylab(expression("Implied total heterogeneity of "~ SD[YAW])) +
+  #ylim(-.15, .1) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 15), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 15), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 7.5, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig13.tiff"), plot = fig13, width = 8, height = 8, units = 'cm', dpi = 300, type = 'cairo')
+
+
+
+
+fig13 <- ggplot(ageranef, aes(age.c, ranef.age.pred.tot)) + 
+  geom_vline(xintercept = 0, size = .5, color = "black", linetype="solid") +
+  geom_hline(yintercept = mean(ranef.age.pred.tot), size = .5, color = "black", linetype="solid") +
+  stat_smooth(method = 'lm', ci = T, color = viridis(5)[3], size = 1) + 
+  geom_jitter(height = 0, width = 0, size = 4,
+              shape = 21, colour = "black", fill = viridis(5)[3], alpha = .95, stroke = 1) + 
+  xlab("Age (mean centered)") +
+  ylab(expression("Average effect N-back of "~ SD[YAW])) +
+  #ylim(-.15, .1) +
+  theme_bw() +
+  theme(legend.position = "bottom", legend.direction = "horizontal", axis.title.x = element_text(size = 11), axis.text.x = element_text(size = 15), axis.title.y = element_text(size = 11), axis.text.y = element_text(size = 15), title = element_text(size = 18), legend.title = element_text(size = 12), legend.text = element_text(size = 12), legend.key = element_blank(), legend.key.width = unit(0.3, 'cm'), legend.key.size = unit(0.1, 'cm'), plot.title = element_text(size = 7.5, face = "bold"), strip.text = element_text(face = "bold", size = 10))
+
+
+ggsave(here::here("takeover_performance_cogload_time_budget/Figures/fig13.png"), plot = fig13, width = 10, height = 7, units = 'cm', dpi = 300, type = 'cairo')
 ```
 
